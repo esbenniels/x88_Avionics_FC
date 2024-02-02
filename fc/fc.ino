@@ -6,6 +6,7 @@
 #include <SPI.h>  // something
 #include <RH_RF95.h>  // radio
 #include <TeensyThreads.h>
+#include <SD.h>  // SD library
 #include <Arduino.h>
 
 #define LED_R 41
@@ -81,45 +82,54 @@ void setup() {
     pinMode(LED_R, OUTPUT);
 
 
-    // setting up sensor settings
-    Serial.begin(9600);
-    while (!Serial);
+  // setting up sensor settings
+  Serial.begin(9600);
+  while (!Serial);
 
-    // radio init
-    if (!radio.init()) {Serial.println("Radio init failed");}
-    if (!radio.setFrequency(RadioFREQ)) {Serial.println("Radio frequency setting failed");}
+  // radio init
+  if (!radio.init()) {Serial.println("Radio init failed");}
+  if (!radio.setFrequency(RadioFREQ)) {Serial.println("Radio frequency setting failed");}
 
-    // IMUs init
-    if (!imu1.begin_I2C()) {Serial.println("IMU1 init failed");}
-    if (!imu2.begin_I2C()) {Serial.println("IMU2 init failed");}
+  // IMUs init
+  if (!imu1.begin_I2C()) {Serial.println("IMU1 init failed");}
+  if (!imu2.begin_I2C()) {Serial.println("IMU2 init failed");}
 
-    Serial.println("IMU1 Sampling Info: ");
-    Serial.print("Gyroscope sample rate = ");
-    Serial.print(imu1.gyroscopeSampleRate());
-    Serial.println(" Hz");
-    Serial.print("Accelerometer sample rate = ");
-    Serial.print(imu1.accelerationSampleRate());
-    Serial.println(" Hz");
-    Serial.println();
-    Serial.println("IMU2 Sampling Info: ");
-    Serial.print("Gyroscope sample rate = ");
-    Serial.print(imu2.gyroscopeSampleRate());
-    Serial.println(" Hz");
-    Serial.print("Accelerometer sample rate = ");
-    Serial.print(imu1.accelerationSampleRate());
-    Serial.println(" Hz");
-    Serial.println();
+  Serial.println("IMU1 Sampling Info: ");
+  Serial.print("Gyroscope sample rate = ");
+  Serial.print(imu1.gyroscopeSampleRate());
+  Serial.println(" Hz");
+  Serial.print("Accelerometer sample rate = ");
+  Serial.print(imu1.accelerationSampleRate());
+  Serial.println(" Hz");
+  Serial.println();
+  Serial.println("IMU2 Sampling Info: ");
+  Serial.print("Gyroscope sample rate = ");
+  Serial.print(imu2.gyroscopeSampleRate());
+  Serial.println(" Hz");
+  Serial.print("Accelerometer sample rate = ");
+  Serial.print(imu1.accelerationSampleRate());
+  Serial.println(" Hz");
+  Serial.println();
 
-    gps.begin(9600);
-    gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
-    gps.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ);
+  gps.begin(9600);
+  gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  gps.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ);
 
-    barom.begin();
-    barom.Enable();
-    // test pressure reading
-    float p;
-    barom.GetPressure(&p);
-    if (!p) {Serial.println("Barometer init failed");}
+  barom.begin();
+  barom.Enable();
+  // test pressure reading
+  float p;
+  barom.GetPressure(&p);
+  if (!p) {Serial.println("Barometer init failed");}
+
+  if (!SD.begin(BUILTIN_SDCARD)) {
+    Serial.println("SD card initialization failed!");
+    while (1);
+  }
+
+  // Create a new file on the SD card
+  File dataFile;
+  dataFile = SD.open("data.txt", FILE_WRITE);
 
 
   //Threading setup
@@ -201,6 +211,39 @@ void sampler() {
 void transmitter() {    // send to radio and SD card
   uint32_t timer = millis();
   // send transmission arrays to SD card
+  File dataFile;
+  dataFile = SD.open("data.txt", FILE_WRITE);
+  if (dataFile) {
+    // Write data to the file
+    // Example: Write GPS data
+    for (int i = 0; i < 100; i++) {
+      dataFile.print(gps_transmit[i][0]);dataFile.print(", ");
+      dataFile.print(gps_transmit[i][1]);dataFile.print(", ");
+      dataFile.print(gps_transmit[i][2]);dataFile.print(", ");
+      dataFile.print(imu1_transmit[i][0]);dataFile.print(", ");
+      dataFile.print(imu1_transmit[i][1]);dataFile.print(", ");
+      dataFile.print(imu1_transmit[i][2]);dataFile.print(", ");
+      dataFile.print(imu1_transmit[i][3]);dataFile.print(", ");
+      dataFile.print(imu1_transmit[i][4]);dataFile.print(", ");
+      dataFile.print(imu1_transmit[i][5]);dataFile.print(", ");
+      dataFile.print(imu2_transmit[i][0]);dataFile.print(", ");
+      dataFile.print(imu2_transmit[i][1]);dataFile.print(", ");
+      dataFile.print(imu2_transmit[i][2]);dataFile.print(", ");
+      dataFile.print(imu2_transmit[i][3]);dataFile.print(", ");
+      dataFile.print(imu2_transmit[i][4]);dataFile.print(", ");
+      dataFile.print(imu2_transmit[i][5]);dataFile.print(", ");
+      dataFile.print(barom_transmit[i][0]);dataFile.print(", ");
+      dataFile.print(barom_transmit[i][1]);dataFile.println();
+    }
+
+    // Close the file
+    dataFile.close();
+  }
+  radio.send((uint8_t*)gps_transmit, sizeof(gps_transmit));
+  radio.send((uint8_t*)imu1_transmit, sizeof(imu1_transmit));
+  radio.send((uint8_t*)imu2_transmit, sizeof(imu2_transmit));
+  radio.send((uint8_t*)barom_transmit, sizeof(barom_transmit));
+
   // send transmission arrays to 
   Serial.print("Transmitting at timer = ");
   Serial.println(timer);
