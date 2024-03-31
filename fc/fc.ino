@@ -140,8 +140,11 @@ void setup() {
 
 
   //Threading setup
-  threads.addThread(sampler);
-  threads.addThread(transmitter);
+  sampleBarometer();
+  // threads.addThread(sampler);
+  Serial.println("Finished sampler");
+  // threads.addThread(transmitter);
+
 
 }
 
@@ -173,12 +176,27 @@ uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
     return crc;
 }
 
+void sampleBarometer() {
+  Serial.println("Sampling barometer");
+  float p, t;
+  uint32_t start = millis();
+  while (millis() - start < 100000) {
+    barom.GetPressure(&p);
+    barom.GetTemperature(&t);
+    // barom_data[0][(int)(timer/10)] = p;
+    // barom_data[1][(int)(timer/10)] = t;
+    Serial.print(p); Serial.print(" ... "); Serial.println(t);
+  }
+}
+
 
 // writing to data arrays at 100 Hz
 void sampler() {
+  Serial.println("Started sampler");
   uint32_t timer = millis();
-  while (timer < 10000) {
-    if (timer % 10 == 0) {
+  Serial.println(timer);
+  while (millis() - timer < 10000) {
+    if (millis() - timer % 10 <= 2 && millis() - timer >= 8) {
       float xg1, yg1, zg1, xg2, yg2, zg2, xa1, ya1, za1, xa2, ya2, za2;
       Serial.print("Sampling ... ");
       if (imu1.gyroscopeAvailable()) {
@@ -212,7 +230,7 @@ void sampler() {
         gps_data[3][(int)(timer/10)] = gps.speed;
       }
       float p, t;
-      Serial.print(" Got to barometer sampling ... ")
+      Serial.print(" Got to barometer sampling ... ");
       barom.GetPressure(&p);
       barom.GetTemperature(&t);
       barom_data[0][(int)(timer/10)] = p;
@@ -221,7 +239,7 @@ void sampler() {
       Serial.print("Data sampled at ");
       Serial.println(timer);
     }
-    if (timer % 1000 == 0) {
+    if (millis() - timer % 1000 == 0) {
       // copy arrays over to transmission arrays
       memcpy(gps_transmit, gps_data, sizeof(gps_data));
       memcpy(imu1_transmit, imu1_data, sizeof(imu1_data));
