@@ -47,8 +47,8 @@
 #define I2C2_SDA    A2
 
 // Components
-TwoWire dev_i2c = Wire;
-LPS22HBSensor PressTemp(&dev_i2c);
+// TwoWire dev_i2c = Wire1;
+LPS22HBSensor PressTemp(&Wire1);
 
 // SPIClass dev_spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 // dev_spi.begin();
@@ -56,11 +56,13 @@ LPS22HBSensor PressTemp(&dev_i2c);
 void setup() {
   // Led.
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(40, OUTPUT);
+
   // Initialize serial for output.
   SerialPort.begin(9600);
 
   // Initialize I2C bus.
-  dev_i2c.begin();
+  Wire1.begin();
 
   // Initlialize components.
   PressTemp.begin();
@@ -75,13 +77,15 @@ void loop() {
   digitalWrite(LED_BUILTIN, LOW);
   delay(250);
 
+  digitalWrite(40, HIGH);
+
   // Read pressure.
   float pressure, temperature;
   PressTemp.GetPressure(&pressure);
   PressTemp.GetTemperature(&temperature);
 
   SerialPort.print("Pres[hPa]: ");
-  SerialPort.print(pressure, 2);
+  SerialPort.print(pressure, 4);
   SerialPort.print(" | Temp[C]: ");
-  SerialPort.println(temperature, 2);
+  SerialPort.println(temperature, 4);
 }
