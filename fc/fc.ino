@@ -1,13 +1,15 @@
 #include <Wire.h>
-#include <Adafruit_GPS.h>  // GPS
+#include <Adafruit_GPS.h>  // GPS   software serial
 #include <SoftwareSerial.h>
-#include <Adafruit_LSM6DSOX.h>  // IMUs
+#include <Adafruit_LSM6DSOX.h>  // IMUs   SPI
 #include <LPS22HBSensor.h>  // barometer
 #include <SPI.h>  // something
 #include <RH_RF95.h>  // radio
 #include <TeensyThreads.h>
 #include <SD.h>  // SD library
 #include <Arduino.h>
+#include <stdint.h>
+#include <SoftwareSerial.h>
 
 #define LED_R 41
 #define LED_G 40
@@ -37,13 +39,17 @@ LPS22HBSensor barom(&dev_i2c);
 
 RH_RF95 radio(RadioCS, RadioINT);
 
-Adafruit_LSM6DSOX imu1;
-Adafruit_LSM6DSOX imu2;
+  Adafruit_LSM6DSOX imu1;
+  Adafruit_LSM6DSOX imu2;
 
 SoftwareSerial mySerial(GPSTx, GPSRx);
 Adafruit_GPS gps(&mySerial);
 
 void setup() {
+
+  Serial.begin(9600);
+  while (!Serial);
+  Serial.println("hello");
   // put your setup code here, to run once:
   // stuff to set up:
     // RADIO - HopeRF RFM95W - LoRaNow library installed
@@ -114,6 +120,7 @@ void setup() {
   gps.begin(9600);
   gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
   gps.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ);
+  Serial.println("GPS init succeeded");
 
   barom.begin();
   barom.Enable();
@@ -129,7 +136,7 @@ void setup() {
 
   // Create a new file on the SD card
   File dataFile;
-  dataFile = SD.open("data.txt", FILE_WRITE);
+  dataFile = SD.open("dataFC.txt", FILE_WRITE);
 
 
   //Threading setup
@@ -140,114 +147,151 @@ void setup() {
 
 // Sampling Data Arrays
 // wiped every second
-float gps_data[100][3];    // gps
-float imu1_data[100][6];   // gyro and accel data 1
-float imu2_data[100][6];   // gyro and accel data 2
-float barom_data[100][2];  // barometer
+float gps_data[4][100];    // gps
+float imu1_data[6][100];   // gyro and accel data 1
+float imu2_data[6][100];   // gyro and accel data 2
+float barom_data[2][100];  // barometer
 
 // Transmission data arrays
-volatile float gps_transmit[100][3];
-volatile float imu1_transmit[100][6];
-volatile float imu2_transmit[100][6];
-volatile float barom_transmit[100][2];
+volatile float gps_transmit[4][100];
+volatile float imu1_transmit[6][100];
+volatile float imu2_transmit[6][100];
+volatile float barom_transmit[2][100];
+
+uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
+    uint16_t crc = 0xFFFF;
+    for (size_t i = 0; i < length; ++i) {
+        crc ^= (uint16_t)data[i] << 8;
+        for (uint8_t bit = 0; bit < 8; ++bit) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
 
 
 // writing to data arrays at 100 Hz
 void sampler() {
   uint32_t timer = millis();
-  while (timer < 2000) {
+  while (timer < 10000) {
     if (timer % 10 == 0) {
       float xg1, yg1, zg1, xg2, yg2, zg2, xa1, ya1, za1, xa2, ya2, za2;
+      Serial.print("Sampling ... ");
       if (imu1.gyroscopeAvailable()) {
         imu1.readGyroscope(xg1, yg1, zg1);
-        imu1_data[(int)(timer/10)][0] = xg1;
-        imu1_data[(int)(timer/10)][1] = yg1;
-        imu1_data[(int)(timer/10)][2] = zg1;
+        imu1_data[0][(int)(timer/10)] = xg1;
+        imu1_data[1][(int)(timer/10)] = yg1;
+        imu1_data[2][(int)(timer/10)] = zg1;
       }
       if (imu2.gyroscopeAvailable()) {
         imu2.readGyroscope(xg2, yg2, zg2);
-        imu2_data[(int)(timer/10)][0] = xg2;
-        imu2_data[(int)(timer/10)][1] = yg2;
-        imu2_data[(int)(timer/10)][2] = zg2;
+        imu2_data[0][(int)(timer/10)] = xg2;
+        imu2_data[1][(int)(timer/10)] = yg2;
+        imu2_data[2][(int)(timer/10)] = zg2;
       }
       if (imu1.accelerationAvailable()) {
         imu1.readAcceleration(xa1, ya1, za1);
-        imu1_data[(int)(timer/10)][3] = xa1;
-        imu1_data[(int)(timer/10)][4] = ya1;
-        imu1_data[(int)(timer/10)][5] = za1;
+        imu1_data[3][(int)(timer/10)] = xa1;
+        imu1_data[4][(int)(timer/10)] = ya1;
+        imu1_data[5][(int)(timer/10)] = za1;
       }
       if (imu2.accelerationAvailable()) {
         imu2.readAcceleration(xa2, ya2, za2);
-        imu2_data[(int)(timer/10)][3] = xa2;
-        imu2_data[(int)(timer/10)][4] = ya2;
-        imu2_data[(int)(timer/10)][5] = za2;
+        imu2_data[3][(int)(timer/10)] = xa2;
+        imu2_data[4][(int)(timer/10)] = ya2;
+        imu2_data[5][(int)(timer/10)] = za2;
       }
       if (gps.fix) {
-        gps_data[(int)(timer/10)][0] = gps.latitude;
-        gps_data[(int)(timer/10)][1] = gps.longitude; 
-        gps_data[(int)(timer/10)][2] = gps.altitude;
+        gps_data[0][(int)(timer/10)] = gps.latitude;
+        gps_data[1][(int)(timer/10)] = gps.longitude; 
+        gps_data[2][(int)(timer/10)] = gps.altitude;
+        gps_data[3][(int)(timer/10)] = gps.speed;
       }
       float p, t;
+      Serial.print(" Got to barometer sampling ... ")
       barom.GetPressure(&p);
       barom.GetTemperature(&t);
-      barom_data[(int)(timer/10)][0] = p;
-      barom_data[(int)(timer/10)][1] = t;
+      barom_data[0][(int)(timer/10)] = p;
+      barom_data[1][(int)(timer/10)] = t;
+      Serial.print(p); Serial.print(" ... "); Serial.println(t);
+      Serial.print("Data sampled at ");
+      Serial.println(timer);
     }
+    if (timer % 1000 == 0) {
+      // copy arrays over to transmission arrays
+      memcpy(gps_transmit, gps_data, sizeof(gps_data));
+      memcpy(imu1_transmit, imu1_data, sizeof(imu1_data));
+      memcpy(imu2_transmit, imu2_data, sizeof(imu2_data));
+      memcpy(barom_transmit, barom_data, sizeof(barom_data));
+      Serial.print("Data copied at ");
+      Serial.println(timer);
+    }
+    
   }
-  if (timer % 1000 == 0) {
-    // copy arrays over to transmission arrays
-    memcpy(gps_transmit, gps_data, sizeof(gps_data));
-    memcpy(imu1_transmit, imu1_data, sizeof(imu1_data));
-    memcpy(imu2_transmit, imu2_data, sizeof(imu2_data));
-    memcpy(barom_transmit, barom_data, sizeof(barom_data));
-    Serial.print("Data copied at ");
-    Serial.println(timer);
-  }
-  Serial.print("Data sampled at ");
-  Serial.println(timer);
-  delay(10);
+  
 }
+
+void sendWithCrc(void* data, size_t len) {
+  uint16_t crc = crc16_ccitt((uint8_t*) data, len);
+  radio.send((uint8_t*) data, len);
+  radio.send((uint8_t*)&crc, sizeof(crc));
+}
+
 
 void transmitter() {    // send to radio and SD card
   uint32_t timer = millis();
   // send transmission arrays to SD card
-  File dataFile;
-  dataFile = SD.open("data.txt", FILE_WRITE);
-  if (dataFile) {
-    // Write data to the file
-    // Example: Write GPS data
-    for (int i = 0; i < 100; i++) {
-      dataFile.print(gps_transmit[i][0]);dataFile.print(", ");
-      dataFile.print(gps_transmit[i][1]);dataFile.print(", ");
-      dataFile.print(gps_transmit[i][2]);dataFile.print(", ");
-      dataFile.print(imu1_transmit[i][0]);dataFile.print(", ");
-      dataFile.print(imu1_transmit[i][1]);dataFile.print(", ");
-      dataFile.print(imu1_transmit[i][2]);dataFile.print(", ");
-      dataFile.print(imu1_transmit[i][3]);dataFile.print(", ");
-      dataFile.print(imu1_transmit[i][4]);dataFile.print(", ");
-      dataFile.print(imu1_transmit[i][5]);dataFile.print(", ");
-      dataFile.print(imu2_transmit[i][0]);dataFile.print(", ");
-      dataFile.print(imu2_transmit[i][1]);dataFile.print(", ");
-      dataFile.print(imu2_transmit[i][2]);dataFile.print(", ");
-      dataFile.print(imu2_transmit[i][3]);dataFile.print(", ");
-      dataFile.print(imu2_transmit[i][4]);dataFile.print(", ");
-      dataFile.print(imu2_transmit[i][5]);dataFile.print(", ");
-      dataFile.print(barom_transmit[i][0]);dataFile.print(", ");
-      dataFile.print(barom_transmit[i][1]);dataFile.println();
+  while (timer < 10000) {
+    if (timer % 1000 == 0) {
+      digitalWrite(LED_G, HIGH);
+      File dataFile;
+      dataFile = SD.open("data.txt", FILE_WRITE);
+      if (dataFile) {
+        // Write data to the file
+        // Example: Write GPS data
+        for (int i = 0; i < 100; i++) {
+          dataFile.print(gps_transmit[0][i]);dataFile.print(", ");
+          dataFile.print(gps_transmit[1][i]);dataFile.print(", ");
+          dataFile.print(gps_transmit[2][i]);dataFile.print(", ");
+          dataFile.print(gps_transmit[3][i]);dataFile.print(", ");
+          dataFile.print(imu1_transmit[0][i]);dataFile.print(", ");
+          dataFile.print(imu1_transmit[1][i]);dataFile.print(", ");
+          dataFile.print(imu1_transmit[2][i]);dataFile.print(", ");
+          dataFile.print(imu1_transmit[3][i]);dataFile.print(", ");
+          dataFile.print(imu1_transmit[4][i]);dataFile.print(", ");
+          dataFile.print(imu1_transmit[5][i]);dataFile.print(", ");
+          dataFile.print(imu2_transmit[0][i]);dataFile.print(", ");
+          dataFile.print(imu2_transmit[1][i]);dataFile.print(", ");
+          dataFile.print(imu2_transmit[2][i]);dataFile.print(", ");
+          dataFile.print(imu2_transmit[3][i]);dataFile.print(", ");
+          dataFile.print(imu2_transmit[4][i]);dataFile.print(", ");
+          dataFile.print(imu2_transmit[5][i]);dataFile.print(", ");
+          dataFile.print(barom_transmit[0][i]);dataFile.print(", ");
+          dataFile.print(barom_transmit[1][i]);dataFile.println();
+        }
+
+        // Close the file
+        dataFile.close();
+      }
+      sendWithCrc(gps_transmit, sizeof(gps_transmit));
+      sendWithCrc(imu1_transmit, sizeof(imu1_transmit));
+      sendWithCrc(imu2_transmit, sizeof(imu2_transmit));
+      sendWithCrc(barom_transmit, sizeof(barom_transmit));
+
+      // send transmission arrays to 
+      Serial.print("Transmitting at timer = ");
+      Serial.println(timer);
+      // letting the led stay on for a bit longer to signal that transmission has happened
+      delay(200);
+      // turn off LED
+      digitalWrite(LED_G, LOW);
     }
-
-    // Close the file
-    dataFile.close();
+    delay(2);
   }
-  radio.send((uint8_t*)gps_transmit, sizeof(gps_transmit));
-  radio.send((uint8_t*)imu1_transmit, sizeof(imu1_transmit));
-  radio.send((uint8_t*)imu2_transmit, sizeof(imu2_transmit));
-  radio.send((uint8_t*)barom_transmit, sizeof(barom_transmit));
-
-  // send transmission arrays to 
-  Serial.print("Transmitting at timer = ");
-  Serial.println(timer);
-  delay(1000);
 }
 
 void loop() {
