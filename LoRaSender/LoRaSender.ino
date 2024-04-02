@@ -2,9 +2,12 @@
 #include <LoRa.h>
 #include <SD.h>
 
-int counter = 0;
-
+int count = 0;
 int cs = 32;
+
+int numbers[12] = {
+    4, 5, 2002, 10, 13, 2003, 5, 10, 2003, 7, 40, 10101
+  };
 
 void setup() {
   Serial.begin(9600);
@@ -44,19 +47,26 @@ void setup() {
 
   dataFile.close();
 
+  
+
+  
+
 }
 
 void loop() {
   Serial.print("Sending packet: ");
-  Serial.println(counter);
+  Serial.println(numbers[count]);
 
   // send packet
   LoRa.beginPacket();
   LoRa.print("hello ");
-  LoRa.print(counter);
+  LoRa.print(numbers[count]);
   LoRa.endPacket();
 
-  counter++;
+  count++;
+  if (count > 11) {
+    count = 0;
+  }
 
-  delay(5000);
+  delay(1000);
 }
