@@ -43,22 +43,16 @@
 #include <LPS22HBSensor.h>
 
 #define SerialPort Serial
-#define I2C2_SCL    A3
-#define I2C2_SDA    A2
+#define I2C2_SCL    PB10
+#define I2C2_SDA    PB11
 
-// Components
-// TwoWire dev_i2c = Wire1;
+// Components.
+// TwoWire dev_i2c(I2C2_SDA, I2C2_SCL);
 LPS22HBSensor PressTemp(&Wire);
-
-// SPIClass dev_spi(SPI_MOSI, SPI_MISO, SPI_SCK);
-// dev_spi.begin();
 
 void setup() {
   // Led.
   pinMode(LED_BUILTIN, OUTPUT);
-  // pinMode(40, OUTPUT);
-  // pinMode(4, OUTPUT);
-
   // Initialize serial for output.
   SerialPort.begin(9600);
 
@@ -78,16 +72,13 @@ void loop() {
   digitalWrite(LED_BUILTIN, LOW);
   delay(250);
 
-  // digitalWrite(40, HIGH);
-  // digitalWrite(4, LOW);
-
   // Read pressure.
   float pressure, temperature;
   PressTemp.GetPressure(&pressure);
   PressTemp.GetTemperature(&temperature);
 
   SerialPort.print("Pres[hPa]: ");
-  SerialPort.print(pressure, 4);
+  SerialPort.print(pressure, 2);
   SerialPort.print(" | Temp[C]: ");
-  SerialPort.println(temperature, 4);
+  SerialPort.println(temperature, 2);
 }

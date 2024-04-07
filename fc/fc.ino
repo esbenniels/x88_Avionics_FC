@@ -150,16 +150,19 @@ void setup() {
 
 // Sampling Data Arrays
 // wiped every second
-float gps_data[4][100];    // gps
-float imu1_data[6][100];   // gyro and accel data 1
-float imu2_data[6][100];   // gyro and accel data 2
-float barom_data[2][100];  // barometer
+
+const int sendingFrequency = 10; // 10 Hz
+
+float gps_data[4][sendingFrequency];    // gps --> [lat, lon, alt, speed]
+float imu1_data[6][sendingFrequency];   // gyro and accel data 1 --> [xg, yg, zg, xa, ya, za]
+float imu2_data[6][sendingFrequency];   // gyro and accel data 2 --> [xg, yg, zg, xa, ya, za]
+float barom_data[2][sendingFrequency];  // barometer --> [pressure, temperature]
 
 // Transmission data arrays
-volatile float gps_transmit[4][100];
-volatile float imu1_transmit[6][100];
-volatile float imu2_transmit[6][100];
-volatile float barom_transmit[2][100];
+volatile float gps_transmit[4][sendingFrequency];
+volatile float imu1_transmit[6][sendingFrequency];
+volatile float imu2_transmit[6][sendingFrequency];
+volatile float barom_transmit[2][sendingFrequency];
 
 uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
     uint16_t crc = 0xFFFF;

@@ -45,6 +45,33 @@ uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
   return crc;
 }
 
+// define variables for the X and Y coordinates of the various flight parameters to be displayed
+int flightTimeX = 220;
+int flightTimeY = 2;
+int signalTitleX = 47;
+int signalTitleY = 42;
+int speedTitleX = 268;
+int speedTitleY = 42;
+int posTitleX = 460;
+int posTitleY = 42;
+int latTitleX = 460;
+int latTitleY = 100;
+int lonTitleX = 460;
+int lonTitleY = 130;
+int altTitleX = 460;
+int altTitleY = 160;
+int tempTitleX = 648;
+int tempTitleY = 42;
+int pressTitleX = 70;
+int pressTitleY = 262;
+int pitchTitleX = 280;
+int pitchTitleY = 262;
+int yawTitleX = 480;
+int yawTitleY = 262;
+int rollTitleX = 675;
+int rollTitleY = 262;
+
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -108,49 +135,45 @@ void setup() {
 
   Serial.println("Finished Drawing Rectangles");
 
-  std::pair<int, int> flightTimeLocation = {220, 2};
-  std::pair<int, int> 
-
-
   tft.textMode();
   tft.cursorBlink(32);
   // Serial.println("Text mode initiated");
-  tft.textSetCursor(220, 2);
+  tft.textSetCursor(flightTimeX, flightTimeY);
   // Serial.println("Cursor positioned");
   tft.textEnlarge(1);
   // char string[22] = "FLIGHT TIME: 04:18.50 s";
   tft.textTransparent(RA8875_WHITE);
   tft.textWrite("FLIGHT TIME: 04:18.50 s");
   // signal strength box
-  tft.textSetCursor(47, 42);
+  tft.textSetCursor(signalStrengthX, signalStrengthY);
   tft.textEnlarge(0);
   tft.textWrite("Signal Strength");
   // altitude box
-  tft.textSetCursor(268, 42);
+  tft.textSetCursor(speedX, speedY);
   tft.textWrite("Speed");
   // GPS box
-  tft.textSetCursor(460, 42);
+  tft.textSetCursor(positionX, positionY);
   tft.textWrite("Position");
-  tft.textSetCursor(460, 100);
+  tft.textSetCursor(latX, latY);
   tft.textWrite("Lat: ");
-  tft.textSetCursor(460, 130);
+  tft.textSetCursor(lonX, lonY);
   tft.textWrite("Lon: ");
-  tft.textSetCursor(460, 160);
+  tft.textSetCursor(altitudeX, altitudeY);
   tft.textWrite("Altitude: ");
   // temperature box
-  tft.textSetCursor(648, 42);
+  tft.textSetCursor(temperatureX, temperatureY);
   tft.textWrite("Temperature");
   // pressure box
-  tft.textSetCursor(70, 262);
+  tft.textSetCursor(pressureX, pressureY);
   tft.textWrite("Pressure");
   // pitch box
-  tft.textSetCursor(280, 262);
+  tft.textSetCursor(pitchX, pitchY);
   tft.textWrite("Pitch");
   // yaw box
-  tft.textSetCursor(480, 262);
+  tft.textSetCursor(yawX, yawY);
   tft.textWrite("Yaw");
   // roll box
-  tft.textSetCursor(675, 262);
+  tft.textSetCursor(rollX, rollY);
   tft.textWrite("Roll");
 
   // test data structures for display updating
