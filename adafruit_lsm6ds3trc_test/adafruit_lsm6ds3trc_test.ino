@@ -25,9 +25,9 @@ void setup(void) {
 
   Serial.println("Adafruit LSM6DS3TR-C test!");
 
-  // if (!lsm6ds3trc.begin_I2C()) {
+  if (!lsm6ds3trc.begin_I2C()) {
     // if (!lsm6ds3trc.begin_SPI(LSM_CS)) {
-  if (!lsm6ds3trc.begin_SPI(LSM_CS, LSM_SCK, LSM_MISO, LSM_MOSI)) {
+  // if (!lsm6ds3trc.begin_SPI(LSM_CS, LSM_SCK, LSM_MISO, LSM_MOSI)) {
     Serial.println("Failed to find LSM6DS3TR-C chip");
     while (1) {
       delay(10);

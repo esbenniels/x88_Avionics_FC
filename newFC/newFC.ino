@@ -10,17 +10,17 @@ Adafruit_GPS gps(&mySerial);
 
 // I2C stuff
 #include "Wire.h"
+#define IMU_I2C_ADDR 0x6A
+#define BAROM_I2C_ADDR 0x5C
 // imu
-#include <Adafruit_LSM6DSOX.h> // IMU - I2C comms
-Adafruit_LSM6DSOX sox1;  // interact through I2C channel 1 - Wire1 - pins 16 and 17
-#define SOX1_CS 40
-// Adafruit_LSM6DSOX sox2;  // interact through I2C channel 1 - Wire1 - pins 18 and 19
+#include <Adafruit_LSM6DS3TRC.h> // IMU - I2C comms
+Adafruit_LSM6DS3TRC imu1;  // interact with I2C address 0x6A
+#define imu1_CS 40
 
 
 // barom
 #include <LPS22HBSensor.h> // barometer - I2C comms
-LPS22HBSensor barom(&Wire2); // put this on Wire2 ports - pins 24 and 25
-#define BAROM_CS 41
+LPS22HBSensor barom(&Wire); // interact with I2C address 0x5C
 
 // radio
 #include <LoRa.h> // LoRa radio
@@ -40,18 +40,20 @@ void setup() {
   Serial.begin(9600);
 
   // IMU setup
-  Wire1.begin();
-  if (!sox1.begin_I2C()) {
+  Wire.beginTransmission(IMU_I2C_ADDR);
+  if (!imu1.begin_I2C()) {
     Serial.println("IMU initialization failed");
   };
-  pinMode(SOX1_CS, OUTPUT);
+  pinMode(imu1_CS, OUTPUT);
+  Wire.endTransmission();
 
   // Barometer setup
-  Wire2.begin();
+  Wire.beginTransmission(BAROM_I2C_ADDR);
   barom.begin();
   barom.Enable();
   barom.SetODR(10);
-  pinMode(BAROM_CS, OUTPUT);
+  Wire.endTransmission();
+  // pinMode(BAROM_CS, OUTPUT);
 
   // GPS setup
   if (!gps.begin(9600)) {
@@ -118,17 +120,20 @@ sensors_event_t accel1, gyro1, temp1, accel2, gyro2, temp2;
 
 void loop() {
   
-  digitalWrite(SOX1_CS, HIGH);
-  digitalWrite(BAROM_CS, HIGH);
-
+  digitalWrite(imu1_CS, HIGH);
+  // digitalWrite(BAROM_CS, HIGH);
+  Wire.beginTransmission(BAROM_I2C_ADDR)
   barom.GetPressure(&pressure);
   barom.GetTemperature(&temperature);
+  Wire.endTransmission();
 
-  if (sox1.accelerationAvailable() && sox1.gyroscopeAvailable()) {
-    sox1.getEvent(&accel1, &gyro1, &temp1);
+  Wire.beginTransmission(IMU_I2C_ADDR);
+  if (imu1.accelerationAvailable() && imu1.gyroscopeAvailable()) {
+    imu1.getEvent(&accel1, &gyro1, &temp1);
   } else {
     Serial.println("Accel and gyro not available");
   }
+  Wire.endTransmission();
 
   if (gps.fix) {
     lat = gps.latitude;
