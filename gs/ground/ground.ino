@@ -2,23 +2,20 @@
 #include <stdint.h>
 #include <Wire.h>
 #include <SoftwareSerial.h>
-#include <RH_RF95.h>  // radio
 #include <SPI.h>  // something
 #include <SD.h>
 #include "Adafruit_GFX.h"
 #include "Adafruit_RA8875.h"
 #include <cstdio>
+#include <LoRa.h>
 
 
 // change these values except the frequency
 #define RadioCS 10      
 #define RadioRST 9
 #define RadioINT 2
-#define RadioFREQ 915.0
 
 #define BUZZ 2
-
-RH_RF95 radio(RadioCS, RadioINT);
 
 // Connect SCLK to UNO Digital #13 (Hardware SPI clock)
 // Connect MISO to UNO Digital #12 (Hardware SPI MISO)
@@ -71,28 +68,28 @@ int yawTitleY = 262;
 int rollTitleX = 675;
 int rollTitleY = 262;
 
-
+File dataFile;
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   while (!Serial);
-  Serial.println("hello");
-
 
   pinMode(BUZZ, OUTPUT);
 
   // radio init
-  if (!radio.init()) {Serial.println("Radio init failed");}
-  if (!radio.setFrequency(RadioFREQ)) {Serial.println("Radio frequency setting failed");}
+  if (!LoRa.begin(915E6)) {
+    Serial.println("Starting LoRa failed!");
+  }
 
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD card initialization failed!");
     while (1);
   }
 
-  File dataFile;
+
   dataFile = SD.open("dataGS.txt", FILE_WRITE);
+  dataFile.print("transmissionTime,signalStrength,latitude,longitude,altitude,speed,temperature,pressure,pitch,yaw,roll//checksum");
 
   /* Initialize the display using 'RA8875_480x80', 'RA8875_480x128', 'RA8875_480x272' or 'RA8875_800x480' */
   if (!tft.begin(RA8875_800x480)) {
@@ -145,35 +142,35 @@ void setup() {
   tft.textTransparent(RA8875_WHITE);
   tft.textWrite("FLIGHT TIME: 04:18.50 s");
   // signal strength box
-  tft.textSetCursor(signalStrengthX, signalStrengthY);
+  tft.textSetCursor(signalTitleX, signalTitleY);
   tft.textEnlarge(0);
   tft.textWrite("Signal Strength");
   // altitude box
-  tft.textSetCursor(speedX, speedY);
+  tft.textSetCursor(speedTitleX, speedTitleY);
   tft.textWrite("Speed");
   // GPS box
-  tft.textSetCursor(positionX, positionY);
+  tft.textSetCursor(posTitleX, posTitleY);
   tft.textWrite("Position");
-  tft.textSetCursor(latX, latY);
+  tft.textSetCursor(latTitleX, latTitleY);
   tft.textWrite("Lat: ");
-  tft.textSetCursor(lonX, lonY);
+  tft.textSetCursor(lonTitleX, lonTitleY);
   tft.textWrite("Lon: ");
-  tft.textSetCursor(altitudeX, altitudeY);
+  tft.textSetCursor(altTitleX, altTitleY);
   tft.textWrite("Altitude: ");
   // temperature box
-  tft.textSetCursor(temperatureX, temperatureY);
+  tft.textSetCursor(tempTitleX, tempTitleY);
   tft.textWrite("Temperature");
   // pressure box
-  tft.textSetCursor(pressureX, pressureY);
+  tft.textSetCursor(pressTitleX, pressTitleY);
   tft.textWrite("Pressure");
   // pitch box
-  tft.textSetCursor(pitchX, pitchY);
+  tft.textSetCursor(pitchTitleX, pitchTitleY);
   tft.textWrite("Pitch");
   // yaw box
-  tft.textSetCursor(yawX, yawY);
+  tft.textSetCursor(yawTitleX, yawTitleY);
   tft.textWrite("Yaw");
   // roll box
-  tft.textSetCursor(rollX, rollY);
+  tft.textSetCursor(rollTitleX, rollTitleY);
   tft.textWrite("Roll");
 
   // test data structures for display updating
@@ -211,43 +208,56 @@ void setup() {
 
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  if (radio.available()) {
-    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-    uint8_t len = sizeof(buf);
-
-    // receiving message
-    if (radio.recv(buf, &len)) {
-      if (len > 2) {
-        // reconstructing the received CRC using bitwise operations and LSB/MSB shifting
-        uint16_t receivedCRC = (buf[len - 2] << 8) | buf[len - 1];  // Reconstruct the CRC
-        // calculating the received CRC
-        uint8_t calculatedCRC = crc16_ccitt(buf, len-2);
-
-        if (receivedCRC == calculatedCRC) {
-          // CRC matches, proceed with writing to SD card
-          File dataFile = SD.open("dataGS.txt", FILE_WRITE);
-          if (dataFile) {
-            // Serial.println(buf);
-            // Serial.println();
-            dataFile.write(buf, len-2);
-            dataFile.close();
-            Serial.println("Data written to SD");
-          }
-          else {
-            Serial.println("Error writing to SD");
-          }
-          // updating display with information
-          // updateGFXValues(gps_data, imu1_data, imu2_data, barom_data);
-        } else {
-          Serial.println("CHECKSUM MISMATCH - POTENTIAL DATA CORRUPTION");
-        }
+  int size = LoRa.parsePacket();
+  if (size) {
+    // parse in message
+    String message = "";
+    while (LoRa.available()) {
+      message += (char)LoRa.read();
+    }
+    // print to Serial and SD card
+    Serial.println(message);    dataFile.print(message);
+    // checksum logic - extracting received checksum and comparing with locally calculated checksum
+    int checksumIndex = message.indexOf("//") + 2;
+    Serial.println("Checksum index: " + checksumIndex);
+    String checksumStr = message.substring(checksumIndex);
+    uint16_t receivedChecksum = (uint16_t) strtol(checksumStr.c_str(), NULL, 16);
+    Serial.println("Received checksum: " + receivedChecksum);
+    String originalMessage = message.substring(0, checksumIndex - 2);
+    // calculate checksum of original message
+    uint16_t calculatedChecksum = crc16_ccitt((uint8_t*) originalMessage.c_str(), originalMessage.length());
+    Serial.println("Calculated checksum: " + calculatedChecksum);
+    //compare calculated checksum with received checksum
+    if (receivedChecksum != calculatedChecksum) {
+      Serial.println("Checksums do not match");
+      dataFile.println("||CORRUPTED||");
+    } else {
+      Serial.println("Checksums match");
+      dataFile.println();
+    }
+    // split originalMessage into an array of floats
+    int numCommas = 0;
+    for (int i = 0; i < originalMessage.length(); i++) {
+      if (originalMessage.charAt(i) == ',') {
+        numCommas++;
       }
-
     }
-    else {
-      Serial.println("Receive failed");
+    float data[numCommas + 1];
+    int prevComma = 0;
+    int dataIndex = 0;
+    for (int i = 0; i < originalMessage.length(); i++) {
+      if (originalMessage.charAt(i) == ',') {
+        String dataStr = originalMessage.substring(prevComma, i);
+        data[dataIndex] = dataStr.toFloat();
+        prevComma = i + 1;
+        dataIndex++;
+      }
     }
+    // update the display with the new data
+    float gps[4] = {data[3], data[4], data[5], data[6]};
+    float imu[6] = {data[7], data[8], data[9], data[10], data[11], data[12]};
+    float barom[2] = {data[1], data[2]};
+    updateGFXValues(gps, imu, barom);
   }
 }
 
@@ -272,6 +282,78 @@ void updateGFXValues(float gps[][10], float imu1[][10], float imu2[][10], float 
   tft.textSetCursor(268, 100);
   tft.textEnlarge(2);
   tft.textWrite(speedAvgStr);
+}
+
+void updateGFXValues(float gps[4], float imu[6], float barom[2]) {
+
+  /*
+  REQUIRES: gps, imu, and barom are arrays of floats with 4, 6, and 2 elements respectively
+  MODIFIES: the display on the TFT screen
+  EFFECTS: updates the display with the new values of the flight parameters
+
+  float[] gps = [lat, lon, alt, speed]
+  float[] imu = [xa, ya, za, xg, yg, zg]
+  float[] barom = [pressure, temperature]
+  */
+
+  String lat, lon, alt, speed, xa, ya, za, xg, yg, zg, pressure, temperature;
+  lat = String(gps[0], 2); lon = String(gps[1], 2); alt = String(gps[2], 2); speed = String(gps[3], 2);
+  xa = String(imu[0], 2); ya = String(imu[1], 2); za = String(imu[2], 2); xg = String(imu[3], 2); yg = String(imu[4], 2); zg = String(imu[5], 2);
+  pressure = String(barom[0], 2); temperature = String(barom[1], 2);
+
+  char latBuf[lat.length() + 1]; char lonBuf[lon.length() + 1]; char altBuf[alt.length() + 1]; char speedBuf[speed.length() + 1];
+  char xaBuf[xa.length() + 1]; char yaBuf[ya.length() + 1]; char zaBuf[za.length() + 1]; char xgBuf[xg.length() + 1]; char ygBuf[yg.length() + 1]; char zgBuf[zg.length() + 1];
+  char pressureBuf[pressure.length() + 1]; char temperatureBuf[temperature.length() + 1];
+  
+  // convert all the strings to buffers for the textWrite function
+  lat.toCharArray(latBuf, lat.length() + 1); lon.toCharArray(lonBuf, lon.length() + 1); alt.toCharArray(altBuf, alt.length() + 1); speed.toCharArray(speedBuf, speed.length() + 1);
+  xa.toCharArray(xaBuf, xa.length() + 1); ya.toCharArray(yaBuf, ya.length() + 1); za.toCharArray(zaBuf, za.length() + 1); xg.toCharArray(xgBuf, xg.length() + 1); yg.toCharArray(ygBuf, yg.length() + 1); zg.toCharArray(zgBuf, zg.length() + 1);
+  pressure.toCharArray(pressureBuf, pressure.length() + 1); temperature.toCharArray(temperatureBuf, temperature.length() + 1);
+
+  // -------------------------------------------------------------------------------------
+  std::pair<int, int> latPos = {510, 100};
+  std::pair<int, int> lonPos = {510, 130};
+  std::pair<int, int> altPos = {510, 160};
+  std::pair<int, int> speedPos = {510, 190};
+  // display the data
+  tft.textSetCursor(latPos.first, latPos.second);
+  tft.textWrite(latBuf);
+  tft.textSetCursor(lonPos.first, lonPos.second);
+  tft.textWrite(lonBuf);
+  tft.textSetCursor(altPos.first, altPos.second);
+  tft.textWrite(altBuf);
+  tft.textSetCursor(speedPos.first, speedPos.second);
+  tft.textWrite(speedBuf);
+  // -------------------------------------------------------------------------------------
+
+  std::pair<int, int> xaPos = {510, 220};
+  std::pair<int, int> yaPos = {510, 250};
+  std::pair<int, int> zaPos = {510, 280};
+  std::pair<int, int> xgPos = {510, 310};
+  std::pair<int, int> ygPos = {510, 340};
+  std::pair<int, int> zgPos = {510, 370};
+  // display the data
+  tft.textSetCursor(xaPos.first, xaPos.second);
+  tft.textWrite(xaBuf);
+  tft.textSetCursor(yaPos.first, yaPos.second);
+  tft.textWrite(yaBuf);
+  tft.textSetCursor(zaPos.first, zaPos.second);
+  tft.textWrite(zaBuf);
+  tft.textSetCursor(xgPos.first, xgPos.second);
+  tft.textWrite(xgBuf);
+  tft.textSetCursor(ygPos.first, ygPos.second);
+  tft.textWrite(ygBuf);
+  tft.textSetCursor(zgPos.first, zgPos.second);
+  tft.textWrite(zgBuf);
+  // -------------------------------------------------------------------------------------
+  std::pair<int, int> pressurePos = {510, 400};
+  std::pair<int, int> temperaturePos = {510, 430};
+  // display the data
+  tft.textSetCursor(pressurePos.first, pressurePos.second);
+  tft.textWrite(pressureBuf);
+  tft.textSetCursor(temperaturePos.first, temperaturePos.second);
+  tft.textWrite(temperatureBuf);
+  // -------------------------------------------------------------------------------------
 }
 
 
@@ -449,6 +531,21 @@ uint16_t color565(uint8_t r, uint8_t g, uint8_t b) {
 byte decToBcd(byte val){
   // Convert normal decimal numbers to binary coded decimal
   return ( (val/10*16) + (val%10) );
+}
+
+uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
+    uint16_t crc = 0xFFFF;
+    for (size_t i = 0; i < length; ++i) {
+        crc ^= (uint16_t)data[i] << 8;
+        for (uint8_t bit = 0; bit < 8; ++bit) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
 }
 
 

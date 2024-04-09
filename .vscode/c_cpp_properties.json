@@ -12,11 +12,17 @@
             ],
             "intelliSenseMode": "gcc-x64",
             "includePath": [
-                "C:\\Users\\esben\\AppData\\Local\\Temp\\arduino\\sketches\\322D3B0C16D8C997348F8B691167DE0D\\pch",
+                "C:\\Users\\esben\\AppData\\Local\\Temp\\arduino\\sketches\\FD4E9B7D7E9E315EC60963D1049F9E0D\\pch",
                 "C:\\Users\\esben\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.59.0\\cores\\teensy4",
-                "C:\\Users\\esben\\Documents\\Arduino\\libraries\\STM32duino_LPS22HB\\src",
                 "C:\\Users\\esben\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.59.0\\libraries\\Wire",
+                "C:\\Users\\esben\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.59.0\\libraries\\SoftwareSerial",
                 "C:\\Users\\esben\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.59.0\\libraries\\SPI",
+                "C:\\Users\\esben\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.59.0\\libraries\\SD\\src",
+                "C:\\Users\\esben\\AppData\\Local\\Arduino15\\packages\\teensy\\hardware\\avr\\1.59.0\\libraries\\SdFat\\src",
+                "C:\\Users\\esben\\Documents\\Arduino\\libraries\\Adafruit_GFX_Library",
+                "C:\\Users\\esben\\Documents\\Arduino\\libraries\\Adafruit_BusIO",
+                "C:\\Users\\esben\\Documents\\Arduino\\libraries\\Adafruit_RA8875",
+                "C:\\Users\\esben\\Documents\\Arduino\\libraries\\LoRa\\src",
                 "c:\\users\\esben\\appdata\\local\\arduino15\\packages\\teensy\\tools\\teensy-compile\\11.3.1\\arm\\arm-none-eabi\\include\\c++\\11.3.1",
                 "c:\\users\\esben\\appdata\\local\\arduino15\\packages\\teensy\\tools\\teensy-compile\\11.3.1\\arm\\arm-none-eabi\\include\\c++\\11.3.1\\arm-none-eabi",
                 "c:\\users\\esben\\appdata\\local\\arduino15\\packages\\teensy\\tools\\teensy-compile\\11.3.1\\arm\\arm-none-eabi\\include\\c++\\11.3.1\\backward",
@@ -25,7 +31,7 @@
                 "c:\\users\\esben\\appdata\\local\\arduino15\\packages\\teensy\\tools\\teensy-compile\\11.3.1\\arm\\arm-none-eabi\\include"
             ],
             "forcedInclude": [
-                "C:\\Users\\esben\\AppData\\Local\\Temp\\arduino\\sketches\\322D3B0C16D8C997348F8B691167DE0D\\pch\\Arduino.h"
+                "C:\\Users\\esben\\AppData\\Local\\Temp\\arduino\\sketches\\FD4E9B7D7E9E315EC60963D1049F9E0D\\pch\\Arduino.h"
             ],
             "cStandard": "c11",
             "cppStandard": "c++17",
