@@ -11,7 +11,7 @@ Adafruit_GPS gps(&mySerial);
 // I2C stuff
 #include "Wire.h"
 #define IMU_I2C_ADDR 0x6A
-#define BAROM_I2C_ADDR 0x5C
+#define BAROM_I2C_ADDR 0x5D
 // imu
 #include <Adafruit_LSM6DS3TRC.h> // IMU - I2C comms
 Adafruit_LSM6DS3TRC imu1;  // interact with I2C address 0x6A
@@ -24,9 +24,10 @@ LPS22HBSensor barom(&Wire); // interact with I2C address 0x5C
 
 // radio
 #include <LoRa.h> // LoRa radio
-const int RADIO_CS = 0;
-#define RADIO_MISO 1
-#define RADIO_MOSI 26
+#define RADIO_CS 10
+#define RADIO_MISO 12
+#define RADIO_MOSI 11
+#define RADIO_SCK 13
 
 // SD Card
 #include <SD.h>
@@ -43,6 +44,7 @@ void setup() {
   Wire.beginTransmission(IMU_I2C_ADDR);
   if (!imu1.begin_I2C()) {
     Serial.println("IMU initialization failed");
+    while(1);
   };
   pinMode(imu1_CS, OUTPUT);
   Wire.endTransmission();
@@ -58,6 +60,7 @@ void setup() {
   // GPS setup
   if (!gps.begin(9600)) {
     Serial.println("GPS initialization failed");
+    while(1);
   };
   gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
   gps.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ);
@@ -73,10 +76,14 @@ void setup() {
   // SD Card setup
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD card initialization failed!");
+    while(1);
   }
 
   dataFile = SD.open("dataFC.txt", FILE_WRITE);
-  dataFile.println("transmissionTime,pressure,temperature,lat,lon,alt,speed,accel1.x,accel1.y,accel1.z,gyro1.x,gyro1.y,gyro1.z,accel2.x,accel2.y,accel2.z,gyro2.x,gyro2.y,gyro2.z//checksum");
+  dataFile.println("transmissionTime,pressure,temperature,lat,lon,alt,speed,accel1.x,accel1.y,accel1.z,gyro1.x,gyro1.y,gyro1.z//checksum");
+
+  // while(1);
+
 }
 
 const int sendingFrequency = 10; // 10 Hz
@@ -116,13 +123,13 @@ float lastTransmissionTime = micros();
 
 float pressure, temperature, lat, lon, alt, speed;
 
-sensors_event_t accel1, gyro1, temp1, accel2, gyro2, temp2;
+sensors_event_t accel1, gyro1, temp1;
 
 void loop() {
-  
+  // Serial.println("loop");
   digitalWrite(imu1_CS, HIGH);
   // digitalWrite(BAROM_CS, HIGH);
-  Wire.beginTransmission(BAROM_I2C_ADDR)
+  Wire.beginTransmission(BAROM_I2C_ADDR);
   barom.GetPressure(&pressure);
   barom.GetTemperature(&temperature);
   Wire.endTransmission();
@@ -149,28 +156,33 @@ void loop() {
     "," + String(lat) + "," + String(lon) + "," + String(alt) + 
     "," + String(speed) + "," + String(accel1.acceleration.x) + "," + String(accel1.acceleration.y) + 
     "," + String(accel1.acceleration.z) + "," + String(gyro1.gyro.x) + "," + String(gyro1.gyro.y) + 
-    "," + String(gyro1.gyro.z) + "," + String(accel2.acceleration.x) + "," + String(accel2.acceleration.y) + 
-    "," + String(accel2.acceleration.z) + "," + String(gyro2.gyro.x) + "," + String(gyro2.gyro.y) + 
-    "," + String(gyro2.gyro.z);
+    "," + String(gyro1.gyro.z);
 
   Serial.println(dataString);
 
   uint16_t dataChecksum = crc16_ccitt((uint8_t*) dataString.c_str(), dataString.length());
+  // Serial.println("Calculated checksum");
 
   // send data packet
   LoRa.beginPacket();
+  // Serial.println("Began packet");
 
   LoRa.print(dataString); LoRa.print("//"); LoRa.print(dataChecksum);
+  // Serial.println("Printed to radio");
 
   LoRa.endPacket();
+
+  // Serial.println("Ended packet");
 
 
   // print to datafile but this time separated by commas
 
   dataFile.print(dataString); dataFile.print("//"); dataFile.print(dataChecksum); dataFile.println();
 
-  while (micros() - lastTransmissionTime < 1000000 / sendingFrequency) {Serial.println("Waiting for next writeTime");}
+  // while (micros() - lastTransmissionTime < 1000000 / sendingFrequency) {Serial.println("Waiting for next writeTime");}
 
-  lastTransmissionTime = micros();
+  // lastTransmissionTime = micros();
+
+  // delay(10);
 
 }

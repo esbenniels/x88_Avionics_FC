@@ -3,7 +3,15 @@
 #include <SD.h>
 
 int count = 0;
-int cs = 32;
+int cs = 10;
+
+// Radio - 
+  // VIN to 5V source
+  // GND to 5V GND
+  // CS to teensy 10
+  // MISO to teensy 12
+  // MOSI to teensy 11
+  // SCK to teensy 13
 
 int numbers[12] = {
     4, 5, 2002, 10, 13, 2003, 5, 10, 2003, 7, 40, 10101

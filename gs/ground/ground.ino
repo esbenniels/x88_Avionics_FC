@@ -11,18 +11,19 @@
 
 
 // change these values except the frequency
-#define RadioCS 10      
-#define RadioRST 9
-#define RadioINT 2
+#define RADIOMISO 12
+#define RADIOMOSI 11
+#define RADIOSCK 13
+#define RADIOCS 10      
 
 #define BUZZ 2
 
 // Connect SCLK to UNO Digital #13 (Hardware SPI clock)
 // Connect MISO to UNO Digital #12 (Hardware SPI MISO)
 // Connect MOSI to UNO Digital #11 (Hardware SPI MOSI)
-#define RA8875_INT 32
-#define RA8875_CS 37
-#define RA8875_RESET 35
+#define RA8875_INT 41
+#define RA8875_CS 9
+#define RA8875_RESET 40
 
 Adafruit_RA8875 tft = Adafruit_RA8875(RA8875_CS, RA8875_RESET);
 
@@ -75,11 +76,14 @@ void setup() {
   Serial.begin(9600);
   while (!Serial);
 
-  pinMode(BUZZ, OUTPUT);
+  // pinMode(BUZZ, OUTPUT);
+
+  LoRa.setPins(RADIOCS);
 
   // radio init
   if (!LoRa.begin(915E6)) {
     Serial.println("Starting LoRa failed!");
+    // while(1);
   }
 
   if (!SD.begin(BUILTIN_SDCARD)) {
@@ -94,7 +98,7 @@ void setup() {
   /* Initialize the display using 'RA8875_480x80', 'RA8875_480x128', 'RA8875_480x272' or 'RA8875_800x480' */
   if (!tft.begin(RA8875_800x480)) {
     Serial.println("RA8875 Not Found!");
-    while (1);
+    // while (1);
   }
 
   Serial.println("Found RA8875");
@@ -533,20 +537,6 @@ byte decToBcd(byte val){
   return ( (val/10*16) + (val%10) );
 }
 
-uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
-    uint16_t crc = 0xFFFF;
-    for (size_t i = 0; i < length; ++i) {
-        crc ^= (uint16_t)data[i] << 8;
-        for (uint8_t bit = 0; bit < 8; ++bit) {
-            if (crc & 0x8000) {
-                crc = (crc << 1) ^ 0x1021;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    return crc;
-}
 
 
 
