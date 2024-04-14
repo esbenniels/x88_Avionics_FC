@@ -11,10 +11,15 @@
 
 
 // change these values except the frequency
-#define RADIOMISO 12
-#define RADIOMOSI 11
-#define RADIOSCK 13
-#define RADIOCS 10      
+#define RADMISO 12
+#define RADMOSI 11
+#define RADSCK 13
+const int RADIOCS = 10;
+
+#define DISPMISO 12
+#define DISPMOSI 11
+#define DISPSCK 13
+const int DISPCS = 9;
 
 #define BUZZ 2
 
@@ -22,10 +27,13 @@
 // Connect MISO to UNO Digital #12 (Hardware SPI MISO)
 // Connect MOSI to UNO Digital #11 (Hardware SPI MOSI)
 #define RA8875_INT 41
-#define RA8875_CS 9
 #define RA8875_RESET 40
 
-Adafruit_RA8875 tft = Adafruit_RA8875(RA8875_CS, RA8875_RESET);
+SPISettings settingsRADIO(2000000, MSBFIRST, SPI_MODE1);
+SPISettings settingsDISP(16000000, LSBFIRST, SPI_MODE3);
+
+
+Adafruit_RA8875 tft = Adafruit_RA8875(DISPCS, RA8875_RESET);
 
 // CRC checksum function
 uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
@@ -71,6 +79,27 @@ int rollTitleY = 262;
 
 File dataFile;
 
+void startSPI(const int CS, SPISettings settings) {
+  digitalWrite(CS, LOW);
+  SPI.beginTransaction(settings);
+}
+
+void endSPI(const int CS) {
+  digitalWrite(CS, HIGH);
+  SPI.endTransaction();
+}
+
+// void startSPI1(const int CS, SPISettings settings) {
+//   digitalWrite(CS, LOW);
+//   SPI1.beginTransaction(settings);
+// }
+
+// void endSPI1(const int CS) {
+//   digitalWrite(CS, HIGH);
+//   SPI1.endTransaction();
+// }
+
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
@@ -78,13 +107,33 @@ void setup() {
 
   // pinMode(BUZZ, OUTPUT);
 
+  pinMode(RADIOCS, OUTPUT);
+  pinMode(DISPCS, OUTPUT);
+
+  SPI.begin();
+  // SPI1.setMISO(DISPMISO);
+  // SPI1.setMOSI(DISPMOSI);
+  // SPI1.setSCK(DISPSCK);
+  // SPI1.begin();
+
+  // digitalWrite(RADIOCS, LOW);
+  // SPI.beginTransaction(settingsRADIO);
+  startSPI(RADIOCS, settingsRADIO);
+
   LoRa.setPins(RADIOCS);
 
   // radio init
   if (!LoRa.begin(915E6)) {
     Serial.println("Starting LoRa failed!");
     // while(1);
+  } else {
+    Serial.println("Starting LoRa succceeded");
   }
+
+  endSPI(RADIOCS);
+
+  // digitalWrite(RADIOCS, HIGH);
+  // SPI.endTransaction();
 
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD card initialization failed!");
@@ -95,13 +144,19 @@ void setup() {
   dataFile = SD.open("dataGS.txt", FILE_WRITE);
   dataFile.print("transmissionTime,signalStrength,latitude,longitude,altitude,speed,temperature,pressure,pitch,yaw,roll//checksum");
 
+  
   /* Initialize the display using 'RA8875_480x80', 'RA8875_480x128', 'RA8875_480x272' or 'RA8875_800x480' */
+  
+  // SPI.beginTransaction(settingsDISP);
+  // digitalWrite(DISPCS, LOW);
+  startSPI(DISPCS, settingsDISP);
+
   if (!tft.begin(RA8875_800x480)) {
     Serial.println("RA8875 Not Found!");
     // while (1);
+  } else {
+    Serial.println("Found RA8875");
   }
-
-  Serial.println("Found RA8875");
 
   tft.displayOn(true);
   tft.GPIOX(true);      // Enable TFT - display enable tied to GPIOX
@@ -175,7 +230,7 @@ void setup() {
   tft.textWrite("Yaw");
   // roll box
   tft.textSetCursor(rollTitleX, rollTitleY);
-  tft.textWrite("Roll");
+  tft.textWrite("Roll"); 
 
   // test data structures for display updating
   float gps[4][10] = {
@@ -207,11 +262,17 @@ void setup() {
 
   updateGFXValues(gps, imu1, imu2, barom);
 
+  // digitalWrite(DISPCS, HIGH);
+  // SPI.endTransaction();
+  endSPI(DISPCS);
+  Serial.println("Finished display initialization");
 }
 
 
 
 void loop() {
+  // startSPI(RADIOCS, settingsRADIO);
+  // Serial.println("Started Radio SPI bus");
   int size = LoRa.parsePacket();
   if (size) {
     // parse in message
@@ -220,19 +281,21 @@ void loop() {
       message += (char)LoRa.read();
     }
     // print to Serial and SD card
+    dataFile = SD.open("dataGS.txt", FILE_WRITE);
     Serial.println(message);    dataFile.print(message);
     // checksum logic - extracting received checksum and comparing with locally calculated checksum
-    int checksumIndex = message.indexOf("//") + 2;
-    Serial.println("Checksum index: " + checksumIndex);
+    int checksumIndex = message.indexOf("/") + 2;
+    // Serial.print("Checksum Index: "); Serial.println(checksumIndex);
     String checksumStr = message.substring(checksumIndex);
-    uint16_t receivedChecksum = (uint16_t) strtol(checksumStr.c_str(), NULL, 16);
-    Serial.println("Received checksum: " + receivedChecksum);
+    // uint16_t receivedChecksum = (uint16_t) strtol(checksumStr.c_str(), NULL, 16);
+    // Serial.print("Received checksum: "); Serial.println(checksumStr);
     String originalMessage = message.substring(0, checksumIndex - 2);
     // calculate checksum of original message
     uint16_t calculatedChecksum = crc16_ccitt((uint8_t*) originalMessage.c_str(), originalMessage.length());
-    Serial.println("Calculated checksum: " + calculatedChecksum);
+    String calculatedChecksumStr = String(calculatedChecksum);
+    // Serial.print("Calculated checksum: "); Serial.println(calculatedChecksumStr);
     //compare calculated checksum with received checksum
-    if (receivedChecksum != calculatedChecksum) {
+    if (checksumStr != calculatedChecksumStr) {
       Serial.println("Checksums do not match");
       dataFile.println("||CORRUPTED||");
     } else {
@@ -261,8 +324,13 @@ void loop() {
     float gps[4] = {data[3], data[4], data[5], data[6]};
     float imu[6] = {data[7], data[8], data[9], data[10], data[11], data[12]};
     float barom[2] = {data[1], data[2]};
+    // endSPI(RADIOCS);
+    startSPI(DISPCS, settingsDISP);
     updateGFXValues(gps, imu, barom);
+    endSPI(DISPCS);
+
   }
+  // endSPI(RADIOCS);
 }
 
 void updateGFXValues(float gps[][10], float imu1[][10], float imu2[][10], float barom[][10]) {
