@@ -183,6 +183,6 @@ void loop() {
 
   // lastTransmissionTime = micros();
 
-  // delay(10);
+  // delay(2000);
 
 }

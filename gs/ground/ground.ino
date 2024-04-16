@@ -56,26 +56,49 @@ int flightTimeX = 220;
 int flightTimeY = 2;
 int signalTitleX = 47;
 int signalTitleY = 42;
-int speedTitleX = 268;
+int speedTitleX = 280;
 int speedTitleY = 42;
 int posTitleX = 460;
 int posTitleY = 42;
-int latTitleX = 460;
+int latTitleX = 415;
 int latTitleY = 100;
-int lonTitleX = 460;
-int lonTitleY = 130;
-int altTitleX = 460;
-int altTitleY = 160;
+int lonTitleX = 415;
+int lonTitleY = 150;
+// int altTitleX = 410;
+// int altTitleY = 160;
 int tempTitleX = 648;
 int tempTitleY = 42;
 int pressTitleX = 70;
 int pressTitleY = 262;
-int pitchTitleX = 280;
-int pitchTitleY = 262;
-int yawTitleX = 480;
-int yawTitleY = 262;
-int rollTitleX = 675;
-int rollTitleY = 262;
+int gyroTitleX = 280;
+int gyroTitleY = 262;
+int accelTitleX = 475;
+int accelTitleY = 262;
+int altTitleX = 663;
+int altTitleY = 262;
+int xgyroX = 218;
+int xgyroY = 320;
+int ygyroX = 218;
+int ygyroY = 370;
+int zgyroX = 218;
+int zgyroY = 420;
+int xaccelX = 415;
+int xaccelY = 320;
+int yaccelX = 415;
+int yaccelY = 370;
+int zaccelX = 415;
+int zaccelY = 420;
+
+int signalBoxBounds[4] = {16, 65, 170, 180};
+int speedBoxBounds[4] = {213, 65, 170, 180};
+int posBoxBounds[4] = {508, 80, 50, 100};
+int tempBoxBounds[4] = {607, 65, 170, 180};
+
+int pressBoxBounds[4] = {16, 285, 170, 180};
+int gyroBoxBounds[4] = {213, 285, 170, 180};
+int accelBoxBounds[4] = {410, 285, 170, 180};
+int altBoxBounds[4] = {607, 285, 170, 180};
+
 
 File dataFile;
 
@@ -142,7 +165,7 @@ void setup() {
 
 
   dataFile = SD.open("dataGS.txt", FILE_WRITE);
-  dataFile.print("transmissionTime,signalStrength,latitude,longitude,altitude,speed,temperature,pressure,pitch,yaw,roll//checksum");
+  dataFile.print("transmissionTime,pressure,temperature,latitude,longitude,altitude,speed,pitch,yaw,roll,signalStrength//checksum");
 
   
   /* Initialize the display using 'RA8875_480x80', 'RA8875_480x128', 'RA8875_480x272' or 'RA8875_800x480' */
@@ -176,7 +199,7 @@ void setup() {
   tft.graphicsMode();
   bmpDraw("MRPL_MissionPatch_24.bmp", 0, 0);
 
-  delay(2000);
+  delay(1500);
 
   tft.fillScreen(RA8875_BLACK);
 
@@ -192,7 +215,8 @@ void setup() {
   Serial.println("Finished Drawing Rectangles");
 
   tft.textMode();
-  tft.cursorBlink(32);
+  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
+  // tft.cursorBlink(32);
   // Serial.println("Text mode initiated");
   tft.textSetCursor(flightTimeX, flightTimeY);
   // Serial.println("Cursor positioned");
@@ -210,57 +234,53 @@ void setup() {
   // GPS box
   tft.textSetCursor(posTitleX, posTitleY);
   tft.textWrite("Position");
+  tft.textEnlarge(1);
   tft.textSetCursor(latTitleX, latTitleY);
   tft.textWrite("Lat: ");
   tft.textSetCursor(lonTitleX, lonTitleY);
   tft.textWrite("Lon: ");
-  tft.textSetCursor(altTitleX, altTitleY);
-  tft.textWrite("Altitude: ");
+  // tft.textSetCursor(altTitleX, altTitleY);
+  // tft.textWrite("Altitude: ");
   // temperature box
+  tft.textEnlarge(0);
   tft.textSetCursor(tempTitleX, tempTitleY);
   tft.textWrite("Temperature");
   // pressure box
   tft.textSetCursor(pressTitleX, pressTitleY);
   tft.textWrite("Pressure");
   // pitch box
-  tft.textSetCursor(pitchTitleX, pitchTitleY);
-  tft.textWrite("Pitch");
+  tft.textSetCursor(gyroTitleX, gyroTitleY);
+  tft.textWrite("Gyro");
   // yaw box
-  tft.textSetCursor(yawTitleX, yawTitleY);
-  tft.textWrite("Yaw");
+  tft.textSetCursor(accelTitleX, accelTitleY);
+  tft.textWrite("Accel");
   // roll box
-  tft.textSetCursor(rollTitleX, rollTitleY);
-  tft.textWrite("Roll"); 
+  tft.textSetCursor(altTitleX, altTitleY);
+  tft.textWrite("Altitude"); 
+
+  tft.textEnlarge(1);
+
+  tft.textSetCursor(xgyroX, xgyroY);
+  tft.textWrite("X: ");
+  tft.textSetCursor(ygyroX, ygyroY);
+  tft.textWrite("Y: ");
+  tft.textSetCursor(zgyroX, zgyroY);
+  tft.textWrite("Z: ");
+
+  tft.textSetCursor(xaccelX, xaccelY);
+  tft.textWrite("X: ");
+  tft.textSetCursor(yaccelX, yaccelY);
+  tft.textWrite("Y: ");
+  tft.textSetCursor(zaccelX, zaccelY);
+  tft.textWrite("Z: ");
 
   // test data structures for display updating
-  float gps[4][10] = {
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-  };
-  float imu1[6][10] = {
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-  };
-  float imu2[6][10] = {
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-  };
-  float barom[2][10] = {
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-  };
+  float gps[4] = {0, 1, 2, 3};
+  float imu1[6] = {0, 1, 2, 3, 4, 5};
+  float imu2[6] = {0, 1, 2, 3, 4, 5};
+  float barom[2] = {0, 1};
 
-  updateGFXValues(gps, imu1, imu2, barom);
+  updateGFXValues(gps, imu1, barom, 0.00, 0);
 
   // digitalWrite(DISPCS, HIGH);
   // SPI.endTransaction();
@@ -322,42 +342,69 @@ void loop() {
     }
     // update the display with the new data
     float gps[4] = {data[3], data[4], data[5], data[6]};
+    // Serial.print("GPS data--> lat: "); Serial.print(data[3]); Serial.print(" lon: "); Serial.print(data[4]); 
+    // Serial.print(" alt: "); Serial.print(data[5]); Serial.print(" speed: "); Serial.println(data[6]);
     float imu[6] = {data[7], data[8], data[9], data[10], data[11], data[12]};
+    // Serial.print("IMU data--> x_accel: "); Serial.print(data[7]); Serial.print(" y_accel: "); Serial.print(data[8]);
+    // Serial.print(" z_accel: "); Serial.print(data[9]); Serial.print(" x_gyro: "); Serial.print(data[10]); Serial.print(" y_gyro: ");
+    // Serial.print(data[11]); Serial.print(" z_gyro: "); Serial.println(data[12]);
     float barom[2] = {data[1], data[2]};
+    // Serial.print("Barometer data--> pressure: "); Serial.print(data[1]); Serial.print(" temperature: "); Serial.println(data[2]);
+    // Serial.print("Signal Strength: "); Serial.println(LoRa.packetRssi());
+    signed int signalStrength = LoRa.packetRssi();
+    // Serial.print("Flight Time: "); Serial.println(data[0]/(1000000), 2);
     // endSPI(RADIOCS);
     startSPI(DISPCS, settingsDISP);
-    updateGFXValues(gps, imu, barom);
+    updateGFXValues(gps, imu, barom, data[0]/(1000000), signalStrength);
     endSPI(DISPCS);
 
   }
   // endSPI(RADIOCS);
 }
 
-void updateGFXValues(float gps[][10], float imu1[][10], float imu2[][10], float barom[][10]) {
-  float altAvg, latAvg, lonAvg, speedAvg, tempAvg, pressAvg, pitchAvg, yawAvg, rollAvg;
-  // iterating through GPS data to obtain latAvg, lonAvg, speedAvg, and altAvg
-  float latSum, lonSum, altSum, speedSum = 0;
-  for (int i = 0; i < sizeof(gps[0])/4; i++) {
-    latSum += gps[0][i]; lonSum += gps[1][i]; altSum += gps[2][i]; speedSum += gps[3][i];
-  }
-  // Serial.println("Calculated sums");
-  // Serial.println(sizeof(gps[0])/4);
-  latAvg = latSum / sizeof(gps[0]) * 4; lonAvg = lonSum / sizeof(gps[1]) * 4; altAvg = altSum / sizeof(gps[2]) * 4; speedAvg = speedSum / sizeof(gps[3]) * 4;
-  // Serial.print("Calculated averages: "); Serial.print(latAvg); Serial.print(", "); Serial.print(lonAvg); Serial.print(", "); Serial.println(speedAvg);
-  int gps_xpos = 510;
-  char latAvgStr[20]; char lonAvgStr[20]; char altAvgStr[20]; char speedAvgStr[20];
-  dtostrf(latAvg, 5, 2, latAvgStr); dtostrf(lonAvg, 5, 2, lonAvgStr); dtostrf(altAvg, 5, 2, altAvgStr); dtostrf(speedAvg, 5, 2, speedAvgStr);
-  tft.textSetCursor(gps_xpos, 100);
-  tft.textWrite(latAvgStr);
-  tft.textSetCursor(gps_xpos, 130);
-  tft.textWrite(lonAvgStr);
-  tft.textSetCursor(268, 100);
-  tft.textEnlarge(2);
-  tft.textWrite(speedAvgStr);
-}
+// void updateGFXValues(float gps[][10], float imu1[][10], float imu2[][10], float barom[][10]) {
+//   float altAvg, latAvg, lonAvg, speedAvg, tempAvg, pressAvg, pitchAvg, yawAvg, rollAvg;
+//   // iterating through GPS data to obtain latAvg, lonAvg, speedAvg, and altAvg
+//   float latSum, lonSum, altSum, speedSum = 0;
+//   for (int i = 0; i < sizeof(gps[0])/4; i++) {
+//     latSum += gps[0][i]; lonSum += gps[1][i]; altSum += gps[2][i]; speedSum += gps[3][i];
+//   }
+//   // Serial.println("Calculated sums");
+//   // Serial.println(sizeof(gps[0])/4);
+//   latAvg = latSum / sizeof(gps[0]) * 4; lonAvg = lonSum / sizeof(gps[1]) * 4; altAvg = altSum / sizeof(gps[2]) * 4; speedAvg = speedSum / sizeof(gps[3]) * 4;
+//   // Serial.print("Calculated averages: "); Serial.print(latAvg); Serial.print(", "); Serial.print(lonAvg); Serial.print(", "); Serial.println(speedAvg);
+//   int gps_xpos = 510;
+//   char latAvgStr[20]; char lonAvgStr[20]; char altAvgStr[20]; char speedAvgStr[20];
+//   dtostrf(latAvg, 5, 2, latAvgStr); dtostrf(lonAvg, 5, 2, lonAvgStr); dtostrf(altAvg, 5, 2, altAvgStr); dtostrf(speedAvg, 5, 2, speedAvgStr);
+//   tft.textSetCursor(gps_xpos, 100);
+//   tft.textWrite(latAvgStr);
+//   tft.textSetCursor(gps_xpos, 130);
+//   tft.textWrite(lonAvgStr);
+//   tft.textSetCursor(268, 100);
+//   tft.textWrite(speedAvgStr);
+// }
 
-void updateGFXValues(float gps[4], float imu[6], float barom[2]) {
+void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTime, signed int signalStrength) {
 
+  // tft.graphicsMode();
+  // tft.fillRect(posBoxBounds[0], posBoxBounds[1], posBoxBounds[2], 
+  //   posBoxBounds[3], RA8875_BLACK);
+  // tft.fillRect(speedBoxBounds[0], speedBoxBounds[1], speedBoxBounds[2], 
+  //   speedBoxBounds[3], RA8875_BLACK);
+  // tft.fillRect(signalBoxBounds[0], signalBoxBounds[1], signalBoxBounds[2],
+  //   signalBoxBounds[3], RA8875_BLACK);
+  // tft.fillRect(pitchBoxBounds[0], pitchBoxBounds[1], pitchBoxBounds[2], 
+  //   pitchBoxBounds[3], RA8875_BLACK);
+  // tft.fillRect(yawBoxBounds[0], yawBoxBounds[1], yawBoxBounds[2], 
+  //   yawBoxBounds[3], RA8875_BLACK);
+  // tft.fillRect(rollBoxBounds[0], rollBoxBounds[1], rollBoxBounds[2], 
+  //   rollBoxBounds[3], RA8875_BLACK);
+  // tft.fillRect(pressBoxBounds[0], pressBoxBounds[1], pressBoxBounds[2], 
+  //   pressBoxBounds[3], RA8875_BLACK);
+  // tft.fillRect(tempBoxBounds[0], tempBoxBounds[1], tempBoxBounds[2],
+  //   tempBoxBounds[3], RA8875_BLACK);
+  // tft.graphicsMode();
+  // tft.textMode();
   /*
   REQUIRES: gps, imu, and barom are arrays of floats with 4, 6, and 2 elements respectively
   MODIFIES: the display on the TFT screen
@@ -383,49 +430,84 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2]) {
   pressure.toCharArray(pressureBuf, pressure.length() + 1); temperature.toCharArray(temperatureBuf, temperature.length() + 1);
 
   // -------------------------------------------------------------------------------------
-  std::pair<int, int> latPos = {510, 100};
-  std::pair<int, int> lonPos = {510, 130};
-  std::pair<int, int> altPos = {510, 160};
-  std::pair<int, int> speedPos = {510, 190};
+  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
+  // tft.setRotation(180);
+
+  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
+  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
+  // tft.cursorBlink(0);
+  tft.textEnlarge(0);
+  std::pair<int, int> latPos = {480, 100};
+  std::pair<int, int> lonPos = {480, 150};
+  std::pair<int, int> altPos = {650, 340};
+  std::pair<int, int> speedPos = {268, 120};
   // display the data
+  tft.textEnlarge(1);
   tft.textSetCursor(latPos.first, latPos.second);
+  tft.textColor(RA8875_WHITE, RA8875_BLACK);
   tft.textWrite(latBuf);
   tft.textSetCursor(lonPos.first, lonPos.second);
   tft.textWrite(lonBuf);
+  tft.textEnlarge(1);
   tft.textSetCursor(altPos.first, altPos.second);
   tft.textWrite(altBuf);
+  tft.textEnlarge(1);
   tft.textSetCursor(speedPos.first, speedPos.second);
   tft.textWrite(speedBuf);
+  tft.textEnlarge(0);
   // -------------------------------------------------------------------------------------
-
   std::pair<int, int> xaPos = {510, 220};
   std::pair<int, int> yaPos = {510, 250};
   std::pair<int, int> zaPos = {510, 280};
-  std::pair<int, int> xgPos = {510, 310};
-  std::pair<int, int> ygPos = {510, 340};
-  std::pair<int, int> zgPos = {510, 370};
+  std::pair<int, int> pitchPos = {510, 310};
+  std::pair<int, int> yawPos = {510, 340};
+  std::pair<int, int> rollPos = {510, 370};
   // display the data
+  tft.textEnlarge(1);
   tft.textSetCursor(xaPos.first, xaPos.second);
   tft.textWrite(xaBuf);
   tft.textSetCursor(yaPos.first, yaPos.second);
   tft.textWrite(yaBuf);
   tft.textSetCursor(zaPos.first, zaPos.second);
   tft.textWrite(zaBuf);
-  tft.textSetCursor(xgPos.first, xgPos.second);
+  tft.textSetCursor(pitchPos.first, pitchPos.second);
   tft.textWrite(xgBuf);
-  tft.textSetCursor(ygPos.first, ygPos.second);
+  tft.textSetCursor(yawPos.first, yawPos.second);
   tft.textWrite(ygBuf);
-  tft.textSetCursor(zgPos.first, zgPos.second);
+  tft.textSetCursor(rollPos.first, rollPos.second);
   tft.textWrite(zgBuf);
   // -------------------------------------------------------------------------------------
-  std::pair<int, int> pressurePos = {510, 400};
-  std::pair<int, int> temperaturePos = {510, 430};
+  std::pair<int, int> pressurePos = {50, 340};
+  std::pair<int, int> temperaturePos = {650, 120};
   // display the data
+  tft.textEnlarge(1);
   tft.textSetCursor(pressurePos.first, pressurePos.second);
   tft.textWrite(pressureBuf);
+  tft.textEnlarge(0);
+  tft.textSetCursor(pressurePos.first + 35, pressurePos.second + 40);
+  tft.textWrite("hPa");
+  tft.textEnlarge(1);
   tft.textSetCursor(temperaturePos.first, temperaturePos.second);
   tft.textWrite(temperatureBuf);
+  tft.textEnlarge(0);
+  tft.textSetCursor(temperaturePos.first + 20, temperaturePos.second + 40);
+  tft.textWrite("deg C");
+  tft.textEnlarge(0);
   // -------------------------------------------------------------------------------------
+  std::pair<int, int> signalStrengthPos = {80, 120};
+
+  // display the data
+  tft.textEnlarge(1);
+  tft.textSetCursor(signalStrengthPos.first, signalStrengthPos.second);
+  // if (signalStrength < 0) {
+    // tft.textWrite("-"); signalStrength *= -1; tft.textWrite(String(signalStrength).c_str());
+  // } else {
+    // tft.textWrite(String(signalStrength).c_str());
+  // }
+  tft.textWrite(String(signalStrength).c_str());
+  tft.textEnlarge(0);
+  tft.textSetCursor(signalStrengthPos.first + 14, signalStrengthPos.second + 40);
+  tft.textWrite("dBm");
 }
 
 
@@ -478,15 +560,15 @@ void bmpDraw(const char *filename, int x, int y) {
     // Serial.println(bmpImageoffset, DEC);
 
     // Read DIB header
-    // Serial.print(F("Header size: "));
+    Serial.print(F("Header size: "));
     Serial.println(read32(bmpFile));
     bmpWidth  = read32(bmpFile);
     bmpHeight = read32(bmpFile);
 
     if(read16(bmpFile) == 1) { // # planes -- must be '1'
       bmpDepth = read16(bmpFile); // bits per pixel
-      // Serial.print(F("Bit Depth: "));
-      // Serial.println(bmpDepth);
+      Serial.print(F("Bit Depth: "));
+      Serial.println(bmpDepth);
       if((bmpDepth == 24) && (read32(bmpFile) == 0)) { // 0 = uncompressed
         goodBmp = true; // Supported BMP format -- proceed!
         Serial.print(F("Image size: "));
