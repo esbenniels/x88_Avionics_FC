@@ -52,8 +52,8 @@ uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
 }
 
 // define variables for the X and Y coordinates of the various flight parameters to be displayed
-int flightTimeX = 220;
-int flightTimeY = 2;
+int flightTimeTitleX = 220;
+int flightTimeTitleY = 2;
 int signalTitleX = 47;
 int signalTitleY = 42;
 int speedTitleX = 280;
@@ -88,6 +88,8 @@ int yaccelX = 415;
 int yaccelY = 370;
 int zaccelX = 415;
 int zaccelY = 420;
+int signalIndicatorX = 21;
+int signalIndicatorY = 210;
 
 int signalBoxBounds[4] = {16, 65, 170, 180};
 int speedBoxBounds[4] = {213, 65, 170, 180};
@@ -121,6 +123,8 @@ void endSPI(const int CS) {
 //   digitalWrite(CS, HIGH);
 //   SPI1.endTransaction();
 // }
+
+float lastReception = millis();
 
 
 void setup() {
@@ -165,7 +169,9 @@ void setup() {
 
 
   dataFile = SD.open("dataGS.txt", FILE_WRITE);
-  dataFile.print("transmissionTime,pressure,temperature,latitude,longitude,altitude,speed,pitch,yaw,roll,signalStrength//checksum");
+  dataFile.println("transmissionTime,pressure,temperature,latitude,longitude,altitude,speed,pitch,yaw,roll,signalStrength//checksum");
+  delay(500);
+  dataFile.close();
 
   
   /* Initialize the display using 'RA8875_480x80', 'RA8875_480x128', 'RA8875_480x272' or 'RA8875_800x480' */
@@ -218,12 +224,12 @@ void setup() {
   // tft.textColor(RA8875_WHITE, RA8875_BLACK);
   // tft.cursorBlink(32);
   // Serial.println("Text mode initiated");
-  tft.textSetCursor(flightTimeX, flightTimeY);
+  tft.textSetCursor(flightTimeTitleX, flightTimeTitleY);
   // Serial.println("Cursor positioned");
   tft.textEnlarge(1);
   // char string[22] = "FLIGHT TIME: 04:18.50 s";
   tft.textTransparent(RA8875_WHITE);
-  tft.textWrite("FLIGHT TIME: 04:18.50 s");
+  tft.textWrite("FLIGHT TIME: 00:00.00 s");
   // signal strength box
   tft.textSetCursor(signalTitleX, signalTitleY);
   tft.textEnlarge(0);
@@ -274,6 +280,10 @@ void setup() {
   tft.textSetCursor(zaccelX, zaccelY);
   tft.textWrite("Z: ");
 
+  tft.textEnlarge(0);
+  tft.textSetCursor(signalIndicatorX, signalIndicatorY);
+  tft.textWrite("Signal: ");
+
   // test data structures for display updating
   float gps[4] = {0, 1, 2, 3};
   float imu1[6] = {0, 1, 2, 3, 4, 5};
@@ -286,6 +296,8 @@ void setup() {
   // SPI.endTransaction();
   endSPI(DISPCS);
   Serial.println("Finished display initialization");
+
+  // dataFile = SD.open("dataGS.txt", FILE_WRITE);
 }
 
 
@@ -300,28 +312,31 @@ void loop() {
     while (LoRa.available()) {
       message += (char)LoRa.read();
     }
+    lastReception = millis();
     // print to Serial and SD card
-    dataFile = SD.open("dataGS.txt", FILE_WRITE);
-    Serial.println(message);    dataFile.print(message);
+    // dataFile = SD.open("dataGS.txt", FILE_WRITE);
+    // Serial.println(message);    // dataFile.print(message);
     // checksum logic - extracting received checksum and comparing with locally calculated checksum
     int checksumIndex = message.indexOf("/") + 2;
     // Serial.print("Checksum Index: "); Serial.println(checksumIndex);
-    String checksumStr = message.substring(checksumIndex);
+    // String checksumStr = message.substring(checksumIndex);
     // uint16_t receivedChecksum = (uint16_t) strtol(checksumStr.c_str(), NULL, 16);
     // Serial.print("Received checksum: "); Serial.println(checksumStr);
     String originalMessage = message.substring(0, checksumIndex - 2);
     // calculate checksum of original message
-    uint16_t calculatedChecksum = crc16_ccitt((uint8_t*) originalMessage.c_str(), originalMessage.length());
-    String calculatedChecksumStr = String(calculatedChecksum);
+    // uint16_t calculatedChecksum = crc16_ccitt((uint8_t*) originalMessage.c_str(), originalMessage.length());
+    // String calculatedChecksumStr = String(calculatedChecksum);
     // Serial.print("Calculated checksum: "); Serial.println(calculatedChecksumStr);
     //compare calculated checksum with received checksum
-    if (checksumStr != calculatedChecksumStr) {
-      Serial.println("Checksums do not match");
-      dataFile.println("||CORRUPTED||");
-    } else {
-      Serial.println("Checksums match");
-      dataFile.println();
-    }
+    // if (checksumStr != calculatedChecksumStr) {
+      // Serial.println("Checksums do not match");
+      // dataFile.println("||CORRUPTED||");
+      // delay(50);
+    // } else {
+      // Serial.println("Checksums match");
+      // dataFile.println();
+      // delay(50);
+    // }
     // split originalMessage into an array of floats
     int numCommas = 0;
     for (int i = 0; i < originalMessage.length(); i++) {
@@ -355,56 +370,29 @@ void loop() {
     // Serial.print("Flight Time: "); Serial.println(data[0]/(1000000), 2);
     // endSPI(RADIOCS);
     startSPI(DISPCS, settingsDISP);
-    updateGFXValues(gps, imu, barom, data[0]/(1000000), signalStrength);
+    updateGFXValues(gps, imu, barom, data[0], signalStrength);
     endSPI(DISPCS);
 
   }
-  // endSPI(RADIOCS);
+  float currTime = millis();
+
+  std::pair<int, int> circleLoc = {110, 220};
+
+  // if time since last reception is between 1 and 3 seconds, display a yellow circle
+  // if time since last reception is greater than 3 seconds, display a red circle
+  // otherwise,display green
+  if (currTime - lastReception > 3000) {
+    tft.fillCircle(circleLoc.first, circleLoc.second, 15, RA8875_RED);
+  } else if (currTime - lastReception > 1000) {
+    tft.fillCircle(circleLoc.first, circleLoc.second, 15, RA8875_YELLOW);
+  } else {
+    tft.fillCircle(circleLoc.first, circleLoc.second, 15, RA8875_GREEN);
+  }
 }
 
-// void updateGFXValues(float gps[][10], float imu1[][10], float imu2[][10], float barom[][10]) {
-//   float altAvg, latAvg, lonAvg, speedAvg, tempAvg, pressAvg, pitchAvg, yawAvg, rollAvg;
-//   // iterating through GPS data to obtain latAvg, lonAvg, speedAvg, and altAvg
-//   float latSum, lonSum, altSum, speedSum = 0;
-//   for (int i = 0; i < sizeof(gps[0])/4; i++) {
-//     latSum += gps[0][i]; lonSum += gps[1][i]; altSum += gps[2][i]; speedSum += gps[3][i];
-//   }
-//   // Serial.println("Calculated sums");
-//   // Serial.println(sizeof(gps[0])/4);
-//   latAvg = latSum / sizeof(gps[0]) * 4; lonAvg = lonSum / sizeof(gps[1]) * 4; altAvg = altSum / sizeof(gps[2]) * 4; speedAvg = speedSum / sizeof(gps[3]) * 4;
-//   // Serial.print("Calculated averages: "); Serial.print(latAvg); Serial.print(", "); Serial.print(lonAvg); Serial.print(", "); Serial.println(speedAvg);
-//   int gps_xpos = 510;
-//   char latAvgStr[20]; char lonAvgStr[20]; char altAvgStr[20]; char speedAvgStr[20];
-//   dtostrf(latAvg, 5, 2, latAvgStr); dtostrf(lonAvg, 5, 2, lonAvgStr); dtostrf(altAvg, 5, 2, altAvgStr); dtostrf(speedAvg, 5, 2, speedAvgStr);
-//   tft.textSetCursor(gps_xpos, 100);
-//   tft.textWrite(latAvgStr);
-//   tft.textSetCursor(gps_xpos, 130);
-//   tft.textWrite(lonAvgStr);
-//   tft.textSetCursor(268, 100);
-//   tft.textWrite(speedAvgStr);
-// }
 
 void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTime, signed int signalStrength) {
 
-  // tft.graphicsMode();
-  // tft.fillRect(posBoxBounds[0], posBoxBounds[1], posBoxBounds[2], 
-  //   posBoxBounds[3], RA8875_BLACK);
-  // tft.fillRect(speedBoxBounds[0], speedBoxBounds[1], speedBoxBounds[2], 
-  //   speedBoxBounds[3], RA8875_BLACK);
-  // tft.fillRect(signalBoxBounds[0], signalBoxBounds[1], signalBoxBounds[2],
-  //   signalBoxBounds[3], RA8875_BLACK);
-  // tft.fillRect(pitchBoxBounds[0], pitchBoxBounds[1], pitchBoxBounds[2], 
-  //   pitchBoxBounds[3], RA8875_BLACK);
-  // tft.fillRect(yawBoxBounds[0], yawBoxBounds[1], yawBoxBounds[2], 
-  //   yawBoxBounds[3], RA8875_BLACK);
-  // tft.fillRect(rollBoxBounds[0], rollBoxBounds[1], rollBoxBounds[2], 
-  //   rollBoxBounds[3], RA8875_BLACK);
-  // tft.fillRect(pressBoxBounds[0], pressBoxBounds[1], pressBoxBounds[2], 
-  //   pressBoxBounds[3], RA8875_BLACK);
-  // tft.fillRect(tempBoxBounds[0], tempBoxBounds[1], tempBoxBounds[2],
-  //   tempBoxBounds[3], RA8875_BLACK);
-  // tft.graphicsMode();
-  // tft.textMode();
   /*
   REQUIRES: gps, imu, and barom are arrays of floats with 4, 6, and 2 elements respectively
   MODIFIES: the display on the TFT screen
@@ -416,7 +404,17 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   */
 
   String lat, lon, alt, speed, xa, ya, za, xg, yg, zg, pressure, temperature;
-  lat = String(gps[0], 2); lon = String(gps[1], 2); alt = String(gps[2], 2); speed = String(gps[3], 2);
+  lat = String(gps[0], 2); lon = String(gps[1], 2); 
+  // convert lat from NMEA format to degrees only
+  int latDeg = (int) gps[0]/100;
+  float latMin = gps[0] - latDeg*100;
+  lat = String(latDeg + latMin/60, 3);
+  // convert lon from NMEA format to degrees only
+  int lonDeg = (int) gps[1]/100;
+  float lonMin = gps[1] - lonDeg*100;
+  lon = String(lonDeg + lonMin/60, 3);
+  
+  alt = String(gps[2], 2); speed = String(gps[3], 2);
   xa = String(imu[0], 2); ya = String(imu[1], 2); za = String(imu[2], 2); xg = String(imu[3], 2); yg = String(imu[4], 2); zg = String(imu[5], 2);
   pressure = String(barom[0], 2); temperature = String(barom[1], 2);
 
@@ -439,7 +437,7 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   tft.textEnlarge(0);
   std::pair<int, int> latPos = {480, 100};
   std::pair<int, int> lonPos = {480, 150};
-  std::pair<int, int> altPos = {650, 340};
+  std::pair<int, int> altPos = {655, 340};
   std::pair<int, int> speedPos = {268, 120};
   // display the data
   tft.textEnlarge(1);
@@ -456,12 +454,12 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   tft.textWrite(speedBuf);
   tft.textEnlarge(0);
   // -------------------------------------------------------------------------------------
-  std::pair<int, int> xaPos = {510, 220};
-  std::pair<int, int> yaPos = {510, 250};
-  std::pair<int, int> zaPos = {510, 280};
-  std::pair<int, int> pitchPos = {510, 310};
-  std::pair<int, int> yawPos = {510, 340};
-  std::pair<int, int> rollPos = {510, 370};
+  std::pair<int, int> xaPos = {447, 320};
+  std::pair<int, int> yaPos = {447, 370};
+  std::pair<int, int> zaPos = {447, 420};
+  std::pair<int, int> xgPos = {250, 320};
+  std::pair<int, int> ygPos = {250, 370};
+  std::pair<int, int> zgPos = {250, 420};
   // display the data
   tft.textEnlarge(1);
   tft.textSetCursor(xaPos.first, xaPos.second);
@@ -470,11 +468,11 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   tft.textWrite(yaBuf);
   tft.textSetCursor(zaPos.first, zaPos.second);
   tft.textWrite(zaBuf);
-  tft.textSetCursor(pitchPos.first, pitchPos.second);
+  tft.textSetCursor(xgPos.first, xgPos.second);
   tft.textWrite(xgBuf);
-  tft.textSetCursor(yawPos.first, yawPos.second);
+  tft.textSetCursor(ygPos.first, ygPos.second);
   tft.textWrite(ygBuf);
-  tft.textSetCursor(rollPos.first, rollPos.second);
+  tft.textSetCursor(zgPos.first, zgPos.second);
   tft.textWrite(zgBuf);
   // -------------------------------------------------------------------------------------
   std::pair<int, int> pressurePos = {50, 340};
@@ -504,10 +502,38 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   // } else {
     // tft.textWrite(String(signalStrength).c_str());
   // }
+  // if signal strength greater than -120 dBm, display signal strength in green text
+  // if signal strength between -160 dBm and -120 dBm, display signal strength in yellow text
+  // if signal strength less than -160 dBm, display signal strength in red text
+  if (signalStrength > -120) {
+    tft.textColor(RA8875_GREEN, RA8875_BLACK);
+  } else if (signalStrength > -160) {
+    tft.textColor(RA8875_YELLOW, RA8875_BLACK);
+  } else {
+    tft.textColor(RA8875_RED, RA8875_BLACK);
+  }
   tft.textWrite(String(signalStrength).c_str());
   tft.textEnlarge(0);
+  tft.textColor(RA8875_WHITE, RA8875_BLACK);
   tft.textSetCursor(signalStrengthPos.first + 14, signalStrengthPos.second + 40);
   tft.textWrite("dBm");
+  // changing back to defaults
+  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
+
+  // -------------------------------------------------------------------------------------
+  // flight time display - incoming flight time is in number of microseconds
+  // convert to string of format "HH:MM:SS.ss"
+  float flightTimeSec = flightTime/1000000;
+  int hours = (int) flightTimeSec/3600;
+  int minutes = (int) (flightTimeSec - hours*3600)/60;
+  float seconds = flightTimeSec - hours*3600 - minutes*60;
+  char flightTimeBuf[22];
+  sprintf(flightTimeBuf, "FLIGHT TIME: %02d:%02d:%05.2f s", hours, minutes, seconds);
+  tft.textEnlarge(1);
+  tft.textSetCursor(flightTimeTitleX, flightTimeTitleY);
+  tft.textWrite(flightTimeBuf);
+  tft.textEnlarge(0);
+
 }
 
 

@@ -81,8 +81,12 @@ void setup() {
 
   dataFile = SD.open("dataFC.txt", FILE_WRITE);
   dataFile.println("transmissionTime,pressure,temperature,lat,lon,alt,speed,accel1.x,accel1.y,accel1.z,gyro1.x,gyro1.y,gyro1.z//checksum");
+  delay(500);
+  dataFile.close();
 
   // while(1);
+
+  // dataFile = SD.open("dataGS.txt", FILE_WRITE);
 
 }
 
@@ -176,8 +180,8 @@ void loop() {
 
 
   // print to datafile but this time separated by commas
-
-  dataFile.print(dataString); dataFile.print("//"); dataFile.print(dataChecksum); dataFile.println();
+  // dataFile = SD.open("dataFC.txt", FILE_WRITE);
+  // dataFile.print(dataString); dataFile.print("//"); dataFile.print(dataChecksum); dataFile.println();
 
   // while (micros() - lastTransmissionTime < 1000000 / sendingFrequency) {Serial.println("Waiting for next writeTime");}
 
