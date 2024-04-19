@@ -46,6 +46,10 @@ void setup() {
     Serial.println("IMU initialization failed");
     while(1);
   };
+
+  imu1.setAccelDataRate(LSM6DS_RATE_6_66K_HZ);
+  imu1.setGyroDataRate(LSM6DS_RATE_6_66K_HZ);
+
   pinMode(imu1_CS, OUTPUT);
   Wire.endTransmission();
 
@@ -53,7 +57,7 @@ void setup() {
   Wire.beginTransmission(BAROM_I2C_ADDR);
   barom.begin();
   barom.Enable();
-  barom.SetODR(10);
+  barom.SetODR(100);
   Wire.endTransmission();
   // pinMode(BAROM_CS, OUTPUT);
 
@@ -64,6 +68,7 @@ void setup() {
   };
   gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
   gps.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ);
+  gps.sendCommand(PMTK_API_SET_FIX_CTL_5HZ);
   Serial.println("GPS init succeeded");
 
   // LoRa setup
@@ -171,7 +176,7 @@ void loop() {
   LoRa.beginPacket();
   // Serial.println("Began packet");
 
-  LoRa.print(dataString); LoRa.print("//"); LoRa.print(dataChecksum);
+  LoRa.print(dataString); LoRa.print("//"); LoRa.print(dataChecksum); LoRa.print("|");
   // Serial.println("Printed to radio");
 
   LoRa.endPacket();
@@ -180,8 +185,8 @@ void loop() {
 
 
   // print to datafile but this time separated by commas
-  // dataFile = SD.open("dataFC.txt", FILE_WRITE);
-  // dataFile.print(dataString); dataFile.print("//"); dataFile.print(dataChecksum); dataFile.println();
+  dataFile = SD.open("dataFC.txt", FILE_WRITE);
+  dataFile.print(dataString); dataFile.print("//"); dataFile.print(dataChecksum); dataFile.println("|");
 
   // while (micros() - lastTransmissionTime < 1000000 / sendingFrequency) {Serial.println("Waiting for next writeTime");}
 

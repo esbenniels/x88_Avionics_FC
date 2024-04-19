@@ -126,6 +126,10 @@ void endSPI(const int CS) {
 
 float lastReception = millis();
 
+float gps[4] = {0, 0, 0, 0};
+float imu[6] = {0, 0, 0, 0, 0, 0};
+float barom[2] = {0, 0};
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -302,11 +306,18 @@ void setup() {
 
 
 
+
+// pre-optimization:
+// average runtime 50,000 microseconds = 0.05 seconds = 0.13 seconds per loop = max display refresh rate = 7.6 Hz
+// post optimization
+
 void loop() {
+  
   // startSPI(RADIOCS, settingsRADIO);
   // Serial.println("Started Radio SPI bus");
   int size = LoRa.parsePacket();
   if (size) {
+    // float startTime = micros();
     // parse in message
     String message = "";
     while (LoRa.available()) {
@@ -314,39 +325,26 @@ void loop() {
     }
     lastReception = millis();
     // print to Serial and SD card
-    // dataFile = SD.open("dataGS.txt", FILE_WRITE);
-    // Serial.println(message);    // dataFile.print(message);
+    dataFile = SD.open("dataGS.txt", FILE_WRITE);
+    Serial.println(message);   dataFile.print(message); dataFile.print("|");
     // checksum logic - extracting received checksum and comparing with locally calculated checksum
     int checksumIndex = message.indexOf("/") + 2;
-    // Serial.print("Checksum Index: "); Serial.println(checksumIndex);
-    // String checksumStr = message.substring(checksumIndex);
-    // uint16_t receivedChecksum = (uint16_t) strtol(checksumStr.c_str(), NULL, 16);
-    // Serial.print("Received checksum: "); Serial.println(checksumStr);
+
+    String checksumStr = message.substring(checksumIndex, message.length() - 1);
     String originalMessage = message.substring(0, checksumIndex - 2);
-    // calculate checksum of original message
-    // uint16_t calculatedChecksum = crc16_ccitt((uint8_t*) originalMessage.c_str(), originalMessage.length());
-    // String calculatedChecksumStr = String(calculatedChecksum);
-    // Serial.print("Calculated checksum: "); Serial.println(calculatedChecksumStr);
-    //compare calculated checksum with received checksum
-    // if (checksumStr != calculatedChecksumStr) {
-      // Serial.println("Checksums do not match");
-      // dataFile.println("||CORRUPTED||");
-      // delay(50);
-    // } else {
-      // Serial.println("Checksums match");
-      // dataFile.println();
-      // delay(50);
-    // }
-    // split originalMessage into an array of floats
-    int numCommas = 0;
-    for (int i = 0; i < originalMessage.length(); i++) {
-      if (originalMessage.charAt(i) == ',') {
-        numCommas++;
-      }
+
+    uint16_t calculatedChecksum = crc16_ccitt((uint8_t*) originalMessage.c_str(), originalMessage.length());
+    String calculatedChecksumStr = String(calculatedChecksum);
+    if (checksumStr != calculatedChecksumStr) {
+      Serial.println("Checksums do not match");
+      dataFile.println("||CORRUPTED||");
+      delay(0.1);
+    } else {
+      Serial.println("Checksums match");
+      dataFile.println();
+      delay(0.1);
     }
-    float data[numCommas + 1];
-    int prevComma = 0;
-    int dataIndex = 0;
+    float data[13]; int prevComma = 0; int dataIndex = 0;
     for (int i = 0; i < originalMessage.length(); i++) {
       if (originalMessage.charAt(i) == ',') {
         String dataStr = originalMessage.substring(prevComma, i);
@@ -356,34 +354,21 @@ void loop() {
       }
     }
     // update the display with the new data
-    float gps[4] = {data[3], data[4], data[5], data[6]};
-    // Serial.print("GPS data--> lat: "); Serial.print(data[3]); Serial.print(" lon: "); Serial.print(data[4]); 
-    // Serial.print(" alt: "); Serial.print(data[5]); Serial.print(" speed: "); Serial.println(data[6]);
-    float imu[6] = {data[7], data[8], data[9], data[10], data[11], data[12]};
-    // Serial.print("IMU data--> x_accel: "); Serial.print(data[7]); Serial.print(" y_accel: "); Serial.print(data[8]);
-    // Serial.print(" z_accel: "); Serial.print(data[9]); Serial.print(" x_gyro: "); Serial.print(data[10]); Serial.print(" y_gyro: ");
-    // Serial.print(data[11]); Serial.print(" z_gyro: "); Serial.println(data[12]);
-    float barom[2] = {data[1], data[2]};
-    // Serial.print("Barometer data--> pressure: "); Serial.print(data[1]); Serial.print(" temperature: "); Serial.println(data[2]);
-    // Serial.print("Signal Strength: "); Serial.println(LoRa.packetRssi());
+    gps[0] = data[3];gps[1] = data[4];gps[2] = data[5];gps[3] = data[6];
+    imu[0] = data[7];imu[1] = data[8];imu[2] = data[9];imu[3] = data[10];imu[4] = data[11];imu[5] = data[12];
+    barom[0] = data[1];barom[1] = data[2];
     signed int signalStrength = LoRa.packetRssi();
-    // Serial.print("Flight Time: "); Serial.println(data[0]/(1000000), 2);
-    // endSPI(RADIOCS);
     startSPI(DISPCS, settingsDISP);
+    // Serial.print("Receiving message took "); Serial.print(micros() - startTime); Serial.println(" microseconds");
     updateGFXValues(gps, imu, barom, data[0], signalStrength);
     endSPI(DISPCS);
 
   }
-  float currTime = millis();
-
   std::pair<int, int> circleLoc = {110, 220};
 
-  // if time since last reception is between 1 and 3 seconds, display a yellow circle
-  // if time since last reception is greater than 3 seconds, display a red circle
-  // otherwise,display green
-  if (currTime - lastReception > 3000) {
+  if (millis() - lastReception > 3000) {
     tft.fillCircle(circleLoc.first, circleLoc.second, 15, RA8875_RED);
-  } else if (currTime - lastReception > 1000) {
+  } else if (millis() - lastReception > 1000) {
     tft.fillCircle(circleLoc.first, circleLoc.second, 15, RA8875_YELLOW);
   } else {
     tft.fillCircle(circleLoc.first, circleLoc.second, 15, RA8875_GREEN);
@@ -391,25 +376,16 @@ void loop() {
 }
 
 
+// average run time about 80,000 microseconds = 0.08 seconds
 void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTime, signed int signalStrength) {
 
-  /*
-  REQUIRES: gps, imu, and barom are arrays of floats with 4, 6, and 2 elements respectively
-  MODIFIES: the display on the TFT screen
-  EFFECTS: updates the display with the new values of the flight parameters
-
-  float[] gps = [lat, lon, alt, speed]
-  float[] imu = [xa, ya, za, xg, yg, zg]
-  float[] barom = [pressure, temperature]
-  */
+  // float startGFXTime = micros();
 
   String lat, lon, alt, speed, xa, ya, za, xg, yg, zg, pressure, temperature;
   lat = String(gps[0], 2); lon = String(gps[1], 2); 
-  // convert lat from NMEA format to degrees only
   int latDeg = (int) gps[0]/100;
   float latMin = gps[0] - latDeg*100;
   lat = String(latDeg + latMin/60, 3);
-  // convert lon from NMEA format to degrees only
   int lonDeg = (int) gps[1]/100;
   float lonMin = gps[1] - lonDeg*100;
   lon = String(lonDeg + lonMin/60, 3);
@@ -422,24 +398,16 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   char xaBuf[xa.length() + 1]; char yaBuf[ya.length() + 1]; char zaBuf[za.length() + 1]; char xgBuf[xg.length() + 1]; char ygBuf[yg.length() + 1]; char zgBuf[zg.length() + 1];
   char pressureBuf[pressure.length() + 1]; char temperatureBuf[temperature.length() + 1];
   
-  // convert all the strings to buffers for the textWrite function
   lat.toCharArray(latBuf, lat.length() + 1); lon.toCharArray(lonBuf, lon.length() + 1); alt.toCharArray(altBuf, alt.length() + 1); speed.toCharArray(speedBuf, speed.length() + 1);
   xa.toCharArray(xaBuf, xa.length() + 1); ya.toCharArray(yaBuf, ya.length() + 1); za.toCharArray(zaBuf, za.length() + 1); xg.toCharArray(xgBuf, xg.length() + 1); yg.toCharArray(ygBuf, yg.length() + 1); zg.toCharArray(zgBuf, zg.length() + 1);
   pressure.toCharArray(pressureBuf, pressure.length() + 1); temperature.toCharArray(temperatureBuf, temperature.length() + 1);
 
   // -------------------------------------------------------------------------------------
-  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
-  // tft.setRotation(180);
-
-  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
-  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
-  // tft.cursorBlink(0);
   tft.textEnlarge(0);
   std::pair<int, int> latPos = {480, 100};
   std::pair<int, int> lonPos = {480, 150};
   std::pair<int, int> altPos = {655, 340};
   std::pair<int, int> speedPos = {268, 120};
-  // display the data
   tft.textEnlarge(1);
   tft.textSetCursor(latPos.first, latPos.second);
   tft.textColor(RA8875_WHITE, RA8875_BLACK);
@@ -453,14 +421,13 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   tft.textSetCursor(speedPos.first, speedPos.second);
   tft.textWrite(speedBuf);
   tft.textEnlarge(0);
-  // -------------------------------------------------------------------------------------
+
   std::pair<int, int> xaPos = {447, 320};
   std::pair<int, int> yaPos = {447, 370};
   std::pair<int, int> zaPos = {447, 420};
   std::pair<int, int> xgPos = {250, 320};
   std::pair<int, int> ygPos = {250, 370};
   std::pair<int, int> zgPos = {250, 420};
-  // display the data
   tft.textEnlarge(1);
   tft.textSetCursor(xaPos.first, xaPos.second);
   tft.textWrite(xaBuf);
@@ -474,10 +441,10 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   tft.textWrite(ygBuf);
   tft.textSetCursor(zgPos.first, zgPos.second);
   tft.textWrite(zgBuf);
-  // -------------------------------------------------------------------------------------
+
   std::pair<int, int> pressurePos = {50, 340};
   std::pair<int, int> temperaturePos = {650, 120};
-  // display the data
+
   tft.textEnlarge(1);
   tft.textSetCursor(pressurePos.first, pressurePos.second);
   tft.textWrite(pressureBuf);
@@ -491,20 +458,12 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   tft.textSetCursor(temperaturePos.first + 20, temperaturePos.second + 40);
   tft.textWrite("deg C");
   tft.textEnlarge(0);
-  // -------------------------------------------------------------------------------------
+
   std::pair<int, int> signalStrengthPos = {80, 120};
 
-  // display the data
+
   tft.textEnlarge(1);
   tft.textSetCursor(signalStrengthPos.first, signalStrengthPos.second);
-  // if (signalStrength < 0) {
-    // tft.textWrite("-"); signalStrength *= -1; tft.textWrite(String(signalStrength).c_str());
-  // } else {
-    // tft.textWrite(String(signalStrength).c_str());
-  // }
-  // if signal strength greater than -120 dBm, display signal strength in green text
-  // if signal strength between -160 dBm and -120 dBm, display signal strength in yellow text
-  // if signal strength less than -160 dBm, display signal strength in red text
   if (signalStrength > -120) {
     tft.textColor(RA8875_GREEN, RA8875_BLACK);
   } else if (signalStrength > -160) {
@@ -517,12 +476,7 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   tft.textColor(RA8875_WHITE, RA8875_BLACK);
   tft.textSetCursor(signalStrengthPos.first + 14, signalStrengthPos.second + 40);
   tft.textWrite("dBm");
-  // changing back to defaults
-  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
 
-  // -------------------------------------------------------------------------------------
-  // flight time display - incoming flight time is in number of microseconds
-  // convert to string of format "HH:MM:SS.ss"
   float flightTimeSec = flightTime/1000000;
   int hours = (int) flightTimeSec/3600;
   int minutes = (int) (flightTimeSec - hours*3600)/60;
@@ -534,6 +488,7 @@ void updateGFXValues(float gps[4], float imu[6], float barom[2], float flightTim
   tft.textWrite(flightTimeBuf);
   tft.textEnlarge(0);
 
+  // Serial.print("updateGFXValues took "); Serial.print(micros() - startGFXTime); Serial.println(" microseconds");
 }
 
 
