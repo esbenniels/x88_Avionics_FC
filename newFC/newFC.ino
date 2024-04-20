@@ -35,6 +35,18 @@ LPS22HBSensor barom(&Wire); // interact with I2C address 0x5C
 // SPI
 #include <SPI.h>
 
+volatile bool beginReceived = false;
+
+void onReceive(int packetSize) {
+  String receivedMessage = "";
+  while (LoRa.available()) {
+    receivedMessage += (char)LoRa.read();
+  }
+  if (receivedMessage == "BEGIN") {
+    beginReceived = true;
+  }
+}
+
 File dataFile;
 
 void setup() {
@@ -89,9 +101,17 @@ void setup() {
   delay(500);
   dataFile.close();
 
-  // while(1);
+  // Wait for "BEGIN" message or timeout after 15 minutes
+  unsigned long startTime = millis();
+  while (!beginReceived && (millis() - startTime < 15 * 60 * 1000)) {
+    delay(100); // Check every second
+  }
 
-  // dataFile = SD.open("dataGS.txt", FILE_WRITE);
+  if (!beginReceived) {
+    Serial.println("Timeout: Failed to receive 'BEGIN' message. Continuing ... ");
+  }
+
+  Serial.println("Received 'BEGIN' message. Continuing ...");
 
 }
 

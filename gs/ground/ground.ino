@@ -33,6 +33,16 @@ SPISettings settingsRADIO(2000000, MSBFIRST, SPI_MODE1);
 SPISettings settingsDISP(16000000, LSBFIRST, SPI_MODE3);
 
 
+const int INT_PIN = 3;
+
+bool allowDataDisplayandWrite = false;
+
+void sendBeginSignal() {
+  LoRa.beginPacket();
+  LoRa.print("BEGIN");
+  LoRa.endPacket();
+}
+
 Adafruit_RA8875 tft = Adafruit_RA8875(DISPCS, RA8875_RESET);
 
 // CRC checksum function
@@ -51,6 +61,9 @@ uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
   return crc;
 }
 
+
+
+
 // define variables for the X and Y coordinates of the various flight parameters to be displayed
 int flightTimeTitleX = 220;
 int flightTimeTitleY = 2;
@@ -64,8 +77,6 @@ int latTitleX = 415;
 int latTitleY = 100;
 int lonTitleX = 415;
 int lonTitleY = 150;
-// int altTitleX = 410;
-// int altTitleY = 160;
 int tempTitleX = 648;
 int tempTitleY = 42;
 int pressTitleX = 70;
@@ -114,16 +125,6 @@ void endSPI(const int CS) {
   SPI.endTransaction();
 }
 
-// void startSPI1(const int CS, SPISettings settings) {
-//   digitalWrite(CS, LOW);
-//   SPI1.beginTransaction(settings);
-// }
-
-// void endSPI1(const int CS) {
-//   digitalWrite(CS, HIGH);
-//   SPI1.endTransaction();
-// }
-
 float lastReception = millis();
 
 float gps[4] = {0, 0, 0, 0};
@@ -136,19 +137,15 @@ void setup() {
   Serial.begin(9600);
   while (!Serial);
 
-  // pinMode(BUZZ, OUTPUT);
+  pinMode(INT_PIN, INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(INT_PIN), sendBeginSignal, HIGH);
 
   pinMode(RADIOCS, OUTPUT);
   pinMode(DISPCS, OUTPUT);
 
   SPI.begin();
-  // SPI1.setMISO(DISPMISO);
-  // SPI1.setMOSI(DISPMOSI);
-  // SPI1.setSCK(DISPSCK);
-  // SPI1.begin();
 
-  // digitalWrite(RADIOCS, LOW);
-  // SPI.beginTransaction(settingsRADIO);
   startSPI(RADIOCS, settingsRADIO);
 
   LoRa.setPins(RADIOCS);
@@ -156,15 +153,11 @@ void setup() {
   // radio init
   if (!LoRa.begin(915E6)) {
     Serial.println("Starting LoRa failed!");
-    // while(1);
   } else {
     Serial.println("Starting LoRa succceeded");
   }
 
   endSPI(RADIOCS);
-
-  // digitalWrite(RADIOCS, HIGH);
-  // SPI.endTransaction();
 
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD card initialization failed!");
@@ -179,14 +172,10 @@ void setup() {
 
   
   /* Initialize the display using 'RA8875_480x80', 'RA8875_480x128', 'RA8875_480x272' or 'RA8875_800x480' */
-  
-  // SPI.beginTransaction(settingsDISP);
-  // digitalWrite(DISPCS, LOW);
   startSPI(DISPCS, settingsDISP);
 
   if (!tft.begin(RA8875_800x480)) {
     Serial.println("RA8875 Not Found!");
-    // while (1);
   } else {
     Serial.println("Found RA8875");
   }
@@ -225,13 +214,11 @@ void setup() {
   Serial.println("Finished Drawing Rectangles");
 
   tft.textMode();
-  // tft.textColor(RA8875_WHITE, RA8875_BLACK);
-  // tft.cursorBlink(32);
-  // Serial.println("Text mode initiated");
+
   tft.textSetCursor(flightTimeTitleX, flightTimeTitleY);
-  // Serial.println("Cursor positioned");
+
   tft.textEnlarge(1);
-  // char string[22] = "FLIGHT TIME: 04:18.50 s";
+
   tft.textTransparent(RA8875_WHITE);
   tft.textWrite("FLIGHT TIME: 00:00.00 s");
   // signal strength box
@@ -249,8 +236,6 @@ void setup() {
   tft.textWrite("Lat: ");
   tft.textSetCursor(lonTitleX, lonTitleY);
   tft.textWrite("Lon: ");
-  // tft.textSetCursor(altTitleX, altTitleY);
-  // tft.textWrite("Altitude: ");
   // temperature box
   tft.textEnlarge(0);
   tft.textSetCursor(tempTitleX, tempTitleY);
@@ -295,13 +280,9 @@ void setup() {
   float barom[2] = {0, 1};
 
   updateGFXValues(gps, imu1, barom, 0.00, 0);
-
-  // digitalWrite(DISPCS, HIGH);
-  // SPI.endTransaction();
   endSPI(DISPCS);
   Serial.println("Finished display initialization");
 
-  // dataFile = SD.open("dataGS.txt", FILE_WRITE);
 }
 
 
@@ -313,8 +294,6 @@ void setup() {
 
 void loop() {
   
-  // startSPI(RADIOCS, settingsRADIO);
-  // Serial.println("Started Radio SPI bus");
   int size = LoRa.parsePacket();
   if (size) {
     // float startTime = micros();
@@ -323,46 +302,52 @@ void loop() {
     while (LoRa.available()) {
       message += (char)LoRa.read();
     }
-    lastReception = millis();
-    // print to Serial and SD card
-    dataFile = SD.open("dataGS.txt", FILE_WRITE);
-    Serial.println(message);   dataFile.print(message); dataFile.print("|");
-    // checksum logic - extracting received checksum and comparing with locally calculated checksum
-    int checksumIndex = message.indexOf("/") + 2;
 
-    String checksumStr = message.substring(checksumIndex, message.length() - 1);
-    String originalMessage = message.substring(0, checksumIndex - 2);
-
-    uint16_t calculatedChecksum = crc16_ccitt((uint8_t*) originalMessage.c_str(), originalMessage.length());
-    String calculatedChecksumStr = String(calculatedChecksum);
-    if (checksumStr != calculatedChecksumStr) {
-      Serial.println("Checksums do not match");
-      dataFile.println("||CORRUPTED||");
-      delay(0.1);
-    } else {
-      Serial.println("Checksums match");
-      dataFile.println();
-      delay(0.1);
+    if (message == "ACK_RECORD") {
+      allowDataDisplayandWrite = true;
     }
-    float data[13]; int prevComma = 0; int dataIndex = 0;
-    for (int i = 0; i < originalMessage.length(); i++) {
-      if (originalMessage.charAt(i) == ',') {
-        String dataStr = originalMessage.substring(prevComma, i);
-        data[dataIndex] = dataStr.toFloat();
-        prevComma = i + 1;
-        dataIndex++;
+
+    if (allowDataDisplayandWrite) {
+      lastReception = millis();
+      // print to Serial and SD card
+      dataFile = SD.open("dataGS.txt", FILE_WRITE);
+      Serial.println(message);   dataFile.print(message); dataFile.print("|");
+      // checksum logic - extracting received checksum and comparing with locally calculated checksum
+      int checksumIndex = message.indexOf("/") + 2;
+
+      String checksumStr = message.substring(checksumIndex, message.length() - 1);
+      String originalMessage = message.substring(0, checksumIndex - 2);
+
+      uint16_t calculatedChecksum = crc16_ccitt((uint8_t*) originalMessage.c_str(), originalMessage.length());
+      String calculatedChecksumStr = String(calculatedChecksum);
+      if (checksumStr != calculatedChecksumStr) {
+        Serial.println("Checksums do not match");
+        dataFile.println("||CORRUPTED||");
+        delay(0.1);
+      } else {
+        Serial.println("Checksums match");
+        dataFile.println();
+        delay(0.1);
       }
+      float data[13]; int prevComma = 0; int dataIndex = 0;
+      for (int i = 0; i < originalMessage.length(); i++) {
+        if (originalMessage.charAt(i) == ',') {
+          String dataStr = originalMessage.substring(prevComma, i);
+          data[dataIndex] = dataStr.toFloat();
+          prevComma = i + 1;
+          dataIndex++;
+        }
+      }
+      // update the display with the new data
+      gps[0] = data[3];gps[1] = data[4];gps[2] = data[5];gps[3] = data[6];
+      imu[0] = data[7];imu[1] = data[8];imu[2] = data[9];imu[3] = data[10];imu[4] = data[11];imu[5] = data[12];
+      barom[0] = data[1];barom[1] = data[2];
+      signed int signalStrength = LoRa.packetRssi();
+      startSPI(DISPCS, settingsDISP);
+      // Serial.print("Receiving message took "); Serial.print(micros() - startTime); Serial.println(" microseconds");
+      updateGFXValues(gps, imu, barom, data[0], signalStrength);
+      endSPI(DISPCS);
     }
-    // update the display with the new data
-    gps[0] = data[3];gps[1] = data[4];gps[2] = data[5];gps[3] = data[6];
-    imu[0] = data[7];imu[1] = data[8];imu[2] = data[9];imu[3] = data[10];imu[4] = data[11];imu[5] = data[12];
-    barom[0] = data[1];barom[1] = data[2];
-    signed int signalStrength = LoRa.packetRssi();
-    startSPI(DISPCS, settingsDISP);
-    // Serial.print("Receiving message took "); Serial.print(micros() - startTime); Serial.println(" microseconds");
-    updateGFXValues(gps, imu, barom, data[0], signalStrength);
-    endSPI(DISPCS);
-
   }
   std::pair<int, int> circleLoc = {110, 220};
 
@@ -372,6 +357,15 @@ void loop() {
     tft.fillCircle(circleLoc.first, circleLoc.second, 15, RA8875_YELLOW);
   } else {
     tft.fillCircle(circleLoc.first, circleLoc.second, 15, RA8875_GREEN);
+  }
+
+  std::pair<int, int> FCStatusLoc = {21, 160};
+  tft.textEnlarge(0);
+  tft.textSetCursor(FCStatusLoc.first, FCStatusLoc.second);
+  if (allowDataDisplayandWrite) {
+    tft.textWrite("FC ack ... rec");
+  } else {
+    tft.textWrite("Wait FC");
   }
 }
 
@@ -667,21 +661,3 @@ byte decToBcd(byte val){
   // Convert normal decimal numbers to binary coded decimal
   return ( (val/10*16) + (val%10) );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
