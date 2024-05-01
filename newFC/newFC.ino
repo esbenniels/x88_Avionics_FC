@@ -37,15 +37,15 @@ LPS22HBSensor barom(&Wire); // interact with I2C address 0x5C
 
 volatile bool beginReceived = false;
 
-void onReceive(int packetSize) {
-  String receivedMessage = "";
-  while (LoRa.available()) {
-    receivedMessage += (char)LoRa.read();
-  }
-  if (receivedMessage == "BEGIN") {
-    beginReceived = true;
-  }
-}
+// void onReceive(int packetSize) {
+//   String receivedMessage = "";
+//   while (LoRa.available()) {
+//     receivedMessage += (char)LoRa.read();
+//   }
+//   if (receivedMessage == "BEGIN") {
+//     beginReceived = true;
+//   }
+// }
 
 File dataFile;
 
@@ -90,6 +90,7 @@ void setup() {
     Serial.println("Starting LoRa failed!");  
   }
 
+
   // SD Card setup
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD card initialization failed!");
@@ -101,10 +102,23 @@ void setup() {
   delay(500);
   dataFile.close();
 
+  Serial.println("Waiting for BEGIN message from ground station...");
   // Wait for "BEGIN" message or timeout after 15 minutes
   unsigned long startTime = millis();
   while (!beginReceived && (millis() - startTime < 15 * 60 * 1000)) {
-    delay(100); // Check every second
+    int size = LoRa.parsePacket();
+    if (size) {
+      Serial.println("Received packet");
+      String message = "";
+      while (LoRa.available()) {
+        message += (char) LoRa.read();
+      }
+      Serial.println(message);
+      if (message == "BEGIN") {
+        beginReceived = true;
+      }
+    }
+    delay(20);
   }
 
   if (!beginReceived) {
@@ -112,6 +126,10 @@ void setup() {
   }
 
   Serial.println("Received 'BEGIN' message. Continuing ...");
+  LoRa.beginPacket();
+  LoRa.print("ACK_RECORD");
+  LoRa.endPacket();
+  delay(1000);
 
 }
 
@@ -154,7 +172,14 @@ float pressure, temperature, lat, lon, alt, speed;
 
 sensors_event_t accel1, gyro1, temp1;
 
+bool firstLoop = true;
+
 void loop() {
+  if (firstLoop) {
+    globalTime = micros();
+    firstLoop = false;
+  }
+
   // Serial.println("loop");
   digitalWrite(imu1_CS, HIGH);
   // digitalWrite(BAROM_CS, HIGH);
