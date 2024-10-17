@@ -43,15 +43,21 @@ const int INT_PIN = 3;
 volatile String FCRecStatus = "dorm"; 
 const int monitorLED = 32;
 
+bool sentFlag = 0;
+
 void sendBEGIN() {
-  LoRa.beginPacket();
-  LoRa.print("BEGIN");
-  LoRa.endPacket();
-  Serial.println("Sent BEGIN to FC");
-  FCRecStatus = "wait";
-  digitalWrite(monitorLED, HIGH);
-  delay(100);
-  digitalWrite(monitorLED, LOW);
+  if (sentFlag == 0) {
+    LoRa.beginPacket();
+    LoRa.print("BEGIN");
+    LoRa.endPacket();
+    Serial.println("Sent BEGIN to FC");
+    FCRecStatus = "wait";
+    digitalWrite(monitorLED, HIGH);
+    delay(100);
+    digitalWrite(monitorLED, LOW);
+    sentFlag = 1;
+  }
+  
 }
 
 
@@ -151,7 +157,7 @@ void setup() {
   
   pinMode(INT_PIN, INPUT_PULLUP);
   Serial.println("Defined INT_PIN");
-  attachInterrupt(digitalPinToInterrupt(INT_PIN), sendBEGIN, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(INT_PIN), sendBEGIN, HIGH);
   Serial.println("Established Interrupt");
 
   pinMode(RADIOCS, OUTPUT);
