@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <Wire.h>
 #include <SoftwareSerial.h>
-#include <SPI.h>  // something
+#include <SPI.h>  // something  
 #include <SD.h>
 #include "Adafruit_GFX.h"
 #include "Adafruit_RA8875.h"
@@ -61,7 +61,7 @@ void sendBEGIN() {
 }
 
 
-Adafruit_RA8875 tft = Adafruit_RA8875(DISPCS, RA8875_RESET);
+//Adafruit_RA8875 tft = Adafruit_RA8875(DISPCS, RA8875_RESET);
 
 // CRC checksum function
 uint16_t crc16_ccitt(const uint8_t* data, size_t length) {
@@ -149,20 +149,22 @@ float gps[4] = {0, 0, 0, 0};
 float imu[6] = {0, 0, 0, 0, 0, 0};
 float barom[2] = {0, 0};
 
+Adafruit_RA8875 tft = Adafruit_RA8875(DISPCS, RA8875_RESET);
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-
+  while (!Serial);
+  Serial.println("Made it to setup");
   
   pinMode(INT_PIN, INPUT_PULLUP);
   Serial.println("Defined INT_PIN");
-  attachInterrupt(digitalPinToInterrupt(INT_PIN), sendBEGIN, HIGH);
+  attachInterrupt(digitalPinToInterrupt(INT_PIN), sendBEGIN, RISING);
   Serial.println("Established Interrupt");
 
   pinMode(RADIOCS, OUTPUT);
   pinMode(DISPCS, OUTPUT);
-  pinMode(monitorLED, OUTPUT);
+  // pinMode(monitorLED, OUTPUT);
 
   SPI.begin();
 
