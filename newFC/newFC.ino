@@ -88,6 +88,9 @@ void setup() {
 
   if (!LoRa.begin(915E6)) {
     Serial.println("Starting LoRa failed!");  
+    while(1){}
+  } else {
+    Serial.println("LoRa Initialization succeeeded");
   }
 
 
@@ -95,6 +98,8 @@ void setup() {
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD card initialization failed!");
     while(1);
+  } else {
+    Serial.println("SD Card Initialization succeeded");
   }
 
   dataFile = SD.open("dataFC.txt", FILE_WRITE);
