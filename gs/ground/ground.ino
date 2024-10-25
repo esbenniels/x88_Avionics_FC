@@ -46,7 +46,7 @@ const int monitorLED = 32;
 bool sentFlag = 0;
 
 void sendBEGIN() {
-  if (sentFlag == 0) {
+  // if (sentFlag == 0) {
     LoRa.beginPacket();
     LoRa.print("BEGIN");
     LoRa.endPacket();
@@ -55,8 +55,8 @@ void sendBEGIN() {
     digitalWrite(monitorLED, HIGH);
     delay(100);
     digitalWrite(monitorLED, LOW);
-    sentFlag = 1;
-  }
+    // sentFlag = 1;
+  // }
   
 }
 
@@ -316,20 +316,29 @@ void setup() {
 
 void loop() {
   
+  startSPI(RADIOCS, settingsRADIO);
   int size = LoRa.parsePacket();
+  endSPI(RADIOCS);
   if (size) {
     // float startTime = micros();
     // parse in message
+    startSPI(RADIOCS, settingsRADIO);
     String message = "";
     while (LoRa.available()) {
       message += (char)LoRa.read();
     }
+    endSPI(RADIOCS);
+
+    Serial.print("Message Received: "); Serial.println(message);
+
+    bool doChecksum = true;
 
     if (message == "ACK_RECORD") {
       FCRecStatus = "rec";
+      doChecksum = false;
     }
 
-    if (FCRecStatus == "rec") {
+    if (FCRecStatus == "rec" && doChecksum) {
       lastReception = millis();
       // print to Serial and SD card
       dataFile = SD.open("dataGS.txt", FILE_WRITE);
@@ -364,7 +373,9 @@ void loop() {
       gps[0] = data[3];gps[1] = data[4];gps[2] = data[5];gps[3] = data[6];
       imu[0] = data[7];imu[1] = data[8];imu[2] = data[9];imu[3] = data[10];imu[4] = data[11];imu[5] = data[12];
       barom[0] = data[1];barom[1] = data[2];
+      startSPI(RADIOCS, settingsRADIO);
       signed int signalStrength = LoRa.packetRssi();
+      endSPI(RADIOCS);
       startSPI(DISPCS, settingsDISP);
       // Serial.print("Receiving message took "); Serial.print(micros() - startTime); Serial.println(" microseconds");
       updateGFXValues(gps, imu, barom, data[0], signalStrength);
