@@ -131,10 +131,14 @@ void setup() {
   }
 
   Serial.println("Received 'BEGIN' message. Continuing ...");
-  LoRa.beginPacket();
-  LoRa.print("ACK_RECORD");
-  LoRa.endPacket();
-  delay(1000);
+  float beginTime = millis();
+  while (millis() - beginTime < 5000) {
+    LoRa.beginPacket();
+    LoRa.print("ACK_RECORD");
+    LoRa.endPacket();
+    Serial.println("Sent ACK_RECORD");
+    delay(500);
+  }
 
 }
 
