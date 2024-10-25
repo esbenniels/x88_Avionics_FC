@@ -1,6 +1,10 @@
 // GPS
 #include <Adafruit_GPS.h>  // GPS   software serial
 #include <SoftwareSerial.h>
+#include <EEPROM.h> // EEPROM library
+
+int EEPROM_address = 0;
+byte value;
 
 #define GPSRx 7
 #define GPSTx 8
@@ -48,6 +52,7 @@ volatile bool beginReceived = false;
 // }
 
 File dataFile;
+String title;
 
 void setup() {
   Serial.begin(9600);
@@ -102,7 +107,13 @@ void setup() {
     Serial.println("SD Card Initialization succeeded");
   }
 
-  dataFile = SD.open("dataFC.txt", FILE_WRITE);
+  value = EEPROM.read(EEPROM_address);
+  byte dataFileTitle = value;
+  EEPROM.write(EEPROM_address, value + 1);
+
+  title = "dataFC" + String(dataFileTitle) + ".txt";
+  Serial.print("Writing to: "); Serial.println(title);
+  dataFile = SD.open(title.c_str(), FILE_WRITE);
   dataFile.println("transmissionTime,pressure,temperature,lat,lon,alt,speed,accel1.x,accel1.y,accel1.z,gyro1.x,gyro1.y,gyro1.z//checksum");
   delay(500);
   dataFile.close();
@@ -136,10 +147,16 @@ void setup() {
     LoRa.beginPacket();
     LoRa.print("ACK_RECORD");
     LoRa.endPacket();
-    Serial.println("Sent ACK_RECORD");
+    delay(500);
+    LoRa.beginPacket();
+    LoRa.print(title);
+    LoRa.endPacket();
+    Serial.print("Sent ACK_RECORD and title -> "); Serial.println(title);
     delay(500);
   }
 
+
+  dataFile = SD.open("dataFC.txt", FILE_WRITE);
 }
 
 const int sendingFrequency = 10; // 10 Hz
