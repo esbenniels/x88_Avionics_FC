@@ -151,6 +151,9 @@ float barom[2] = {0, 0};
 
 Adafruit_RA8875 tft = Adafruit_RA8875(DISPCS, RA8875_RESET);
 
+bool dataFileNameReceived = false;
+String title;
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
@@ -187,10 +190,10 @@ void setup() {
   }
 
 
-  dataFile = SD.open("dataGS.txt", FILE_WRITE);
-  dataFile.println("transmissionTime,pressure,temperature,latitude,longitude,altitude,speed,pitch,yaw,roll,signalStrength//checksum");
-  delay(500);
-  dataFile.close();
+  // dataFile = SD.open("dataGS.txt", FILE_WRITE);
+  // dataFile.println("transmissionTime,pressure,temperature,latitude,longitude,altitude,speed,pitch,yaw,roll,signalStrength//checksum");
+  // delay(500);
+  // dataFile.close();
 
   
   /* Initialize the display using 'RA8875_480x80', 'RA8875_480x128', 'RA8875_480x272' or 'RA8875_800x480' */
@@ -336,13 +339,26 @@ void loop() {
     if (message == "ACK_RECORD") {
       FCRecStatus = "rec";
       doChecksum = false;
+    } 
+    if (message.indexOf("dataFC") > -1 && !dataFileNameReceived) {
+      FCRecStatus = "rec";
+      int commaIndex = message.indexOf(",");
+      String suffix = message.substring(commaIndex+7);
+      title = "dataGS"+suffix;
+      Serial.print("Writing data into "); Serial.println(title);
+      dataFile = SD.open(title.c_str(), FILE_WRITE);
+      dataFile.println("transmissionTime,pressure,temperature,latitude,longitude,altitude,speed,pitch,yaw,roll,signalStrength//checksum");
+      delay(500);
+      dataFile.close();
+      dataFileNameReceived = true;
+      doChecksum = false;
     }
 
     if (FCRecStatus == "rec" && doChecksum) {
       lastReception = millis();
       // print to Serial and SD card
-      dataFile = SD.open("dataGS.txt", FILE_WRITE);
-      Serial.println(message);   dataFile.print(message); dataFile.print("|");
+      dataFile = SD.open(title.c_str(), FILE_WRITE);
+      dataFile.print(message); dataFile.print("|");
       // checksum logic - extracting received checksum and comparing with locally calculated checksum
       int checksumIndex = message.indexOf("/") + 2;
 
