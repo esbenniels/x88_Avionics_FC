@@ -156,7 +156,7 @@ void setup() {
   }
 
 
-  dataFile = SD.open("dataFC.txt", FILE_WRITE);
+  dataFile = SD.open(title.c_str(), FILE_WRITE);
 }
 
 const int sendingFrequency = 10; // 10 Hz
@@ -256,8 +256,9 @@ void loop() {
 
 
   // print to datafile but this time separated by commas
-  dataFile = SD.open("dataFC.txt", FILE_WRITE);
+  dataFile = SD.open(title.c_str(), FILE_WRITE);
   dataFile.print(dataString); dataFile.print("//"); dataFile.print(dataChecksum); dataFile.println("|");
+  dataFile.close();
 
   // while (micros() - lastTransmissionTime < 1000000 / sendingFrequency) {Serial.println("Waiting for next writeTime");}
 

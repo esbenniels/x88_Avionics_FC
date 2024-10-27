@@ -157,8 +157,8 @@ String title;
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  while (!Serial);
-  Serial.println("Made it to setup");
+  // while (!Serial);
+  // Serial.println("Made it to setup");
   
   pinMode(INT_PIN, INPUT_PULLUP);
   Serial.println("Defined INT_PIN");
