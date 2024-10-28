@@ -257,7 +257,9 @@ void loop() {
 
   // print to datafile but this time separated by commas
   dataFile = SD.open(title.c_str(), FILE_WRITE);
+  dataString = dataString + "//" + dataChecksum + "|";
   dataFile.print(dataString); dataFile.print("//"); dataFile.print(dataChecksum); dataFile.println("|");
+  delay(5);
   dataFile.close();
 
   // while (micros() - lastTransmissionTime < 1000000 / sendingFrequency) {Serial.println("Waiting for next writeTime");}
